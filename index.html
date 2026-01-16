@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MANDEVAL – Vaccine Mandate Decision Aid (Australia, France, Italy)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Optional libraries if you later add charts or exports -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script src="script.js" defer></script>
+</head>
+<body id="mandevalAppRoot" data-theme="who-light">
+<header class="app-header">
+  <div class="app-header-left">
+    <div class="app-logo-circle">
+      <span class="app-logo-mark">M</span>
+    </div>
+    <div class="app-title-block">
+      <h1 class="app-title">MANDEVAL</h1>
+      <p class="app-subtitle">Vaccine mandate design decision aid</p>
+    </div>
+  </div>
+  <div class="app-header-center">
+    <div class="app-header-line">Support decisions on COVID-19 vaccine mandates</div>
+    <div class="app-header-line">Australia · France · Italy</div>
+  </div>
+  <div class="app-header-right">
+    <span class="badge badge-primary">Policy decision aid</span>
+    <span class="badge badge-outline">Prototype</span>
+    <a href="technical-appendix.html"
+       target="_blank"
+       class="btn-link-small">
+      Technical appendix
+    </a>
+  </div>
+</header>
+
+<main class="app-shell">
+  <!-- TAB BAR -->
+  <nav class="tab-bar">
+    <button class="tab-link tablink active" data-tab="introTab" type="button">Introduction</button>
+    <button class="tab-link tablink" data-tab="configTab" type="button">Configuration</button>
+    <button class="tab-link tablink" data-tab="costsTab" type="button">Costs</button>
+    <button class="tab-link tablink" data-tab="benefitsTab" type="button">Benefits</button>
+    <button class="tab-link tablink" data-tab="resultsTab" type="button">Results &amp; ranking</button>
+    <button class="tab-link tablink" data-tab="scenariosTab" type="button">Saved scenarios</button>
+    <button class="tab-link tablink" data-tab="briefingsTab" type="button">Briefings (Copilot / ChatGPT)</button>
+    <button class="tab-link tablink" data-tab="attributesTab" type="button">Attributes &amp; levels</button>
+    <button class="tab-link tablink" data-tab="evidenceTab" type="button">Evidence &amp; parameters</button>
+    <button class="tab-link tablink" data-tab="exportTab" type="button">Export &amp; data</button>
+  </nav>
+
+  <!-- INTRO TAB -->
+  <section id="introTab" class="tab-panel active">
+    <div class="grid-two">
+      <div class="card">
+        <h2>What this tool does</h2>
+        <p>
+          MANDEVAL helps governments and partners compare alternative vaccine mandate designs across
+          Australia, France and Italy. It links three elements:
+        </p>
+        <ul class="plain-list">
+          <li>Key design choices such as scope, exemptions, coverage and expected lives saved.</li>
+          <li>Simple cost inputs for administration, communication and enforcement.</li>
+          <li>A basic benefit framework so you can express expected health gains in monetary terms if needed.</li>
+        </ul>
+        <p class="note">
+          The numbers shown are examples only. You can replace them with your own estimates or with
+          values from your vaccine mandate studies and costing work.
+        </p>
+      </div>
+      <div class="card">
+        <h2>How to use it</h2>
+        <ol class="plain-list numbered">
+          <li>Go to <strong>Step 1 · Configure</strong> and choose country, outbreak scenario and mandate design.</li>
+          <li>In <strong>Step 2 · Costs</strong>, add administration, communication and enforcement costs.</li>
+          <li>In <strong>Step 3 · Benefits</strong>, enter expected lives saved per 100,000 and the monetary value you use per life saved.</li>
+          <li>Click <strong>Apply configuration</strong> to update the summary, then <strong>Save scenario</strong>.</li>
+          <li>Use the <strong>Results &amp; ranking</strong> tab to compare saved scenarios and see which options score best on benefit–cost ratio and support.</li>
+          <li>Use <strong>Briefings</strong> to generate short narrative summaries and prompts for Copilot or ChatGPT.</li>
+        </ol>
+        <p class="note">
+          The aim is not to replace detailed modelling, but to give a transparent way to compare a small set of mandate options in meetings and policy briefs.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONFIG TAB -->
+  <section id="configTab" class="tab-panel">
+    <div class="grid-two-stretch">
+      <div class="card card-config">
+        <div class="card-header-with-info">
+          <div>
+            <h2>Step 1 · Choose a mandate configuration</h2>
+            <p class="card-subtitle">Country, outbreak scenario and key design features.</p>
+          </div>
+        </div>
+
+        <form id="config-form" class="form-grid">
+          <div class="form-group">
+            <label for="cfg-country">Country</label>
+            <select id="cfg-country">
+              <option value="">Select...</option>
+              <option value="AU">Australia</option>
+              <option value="FR">France</option>
+              <option value="IT">Italy</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-outbreak">Outbreak scenario</label>
+            <select id="cfg-outbreak">
+              <option value="mild">Mild outbreak</option>
+              <option value="severe">Severe outbreak</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-scope">Scope of mandate</label>
+            <select id="cfg-scope">
+              <option value="highrisk">High-risk occupations only</option>
+              <option value="all">All occupations and public spaces</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-exemptions">Exemptions</label>
+            <select id="cfg-exemptions">
+              <option value="medical">Medical only</option>
+              <option value="medrel">Medical + religious</option>
+              <option value="medrelpers">Medical + religious + personal</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-coverage">Target coverage (share vaccinated)</label>
+            <select id="cfg-coverage">
+              <option value="0.5">50%</option>
+              <option value="0.7">70%</option>
+              <option value="0.9">90%</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-pop">Population covered (millions)</label>
+            <input id="cfg-pop" type="number" min="0" step="0.1" value="1">
+          </div>
+
+          <div class="form-group form-group-wide">
+            <label for="cfg-notes">Short label for this configuration</label>
+            <input id="cfg-notes" type="text" placeholder="For example: AU, mild, high-risk only, 70% coverage">
+          </div>
+        </form>
+
+        <div class="form-actions">
+          <button type="button" id="btn-apply-config" class="btn-primary">Apply configuration</button>
+          <button type="button" id="btn-view-summary" class="btn-secondary">View results summary</button>
+          <button type="button" id="btn-save-scenario" class="btn-ghost">Save scenario</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Current configuration at a glance</h3>
+        <p class="text-muted" id="cfg-summary-empty">
+          No configuration applied yet. Fill the form on the left and click <strong>Apply configuration</strong>.
+        </p>
+        <div id="cfg-summary" class="cfg-summary" hidden>
+          <ul class="plain-list">
+            <li><strong>Country:</strong> <span id="cfg-summary-country"></span></li>
+            <li><strong>Outbreak scenario:</strong> <span id="cfg-summary-outbreak"></span></li>
+            <li><strong>Scope:</strong> <span id="cfg-summary-scope"></span></li>
+            <li><strong>Exemptions:</strong> <span id="cfg-summary-exemptions"></span></li>
+            <li><strong>Coverage target:</strong> <span id="cfg-summary-coverage"></span></li>
+            <li><strong>Population covered:</strong> <span id="cfg-summary-pop"></span></li>
+          </ul>
+          <p class="note">
+            Costs and benefits are set in the next two steps. Once those are added, this panel will also show the
+            benefit–cost ratio and an indicative support index.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COSTS TAB -->
+  <section id="costsTab" class="tab-panel">
+    <div class="grid-two-stretch">
+      <div class="card">
+        <h2>Step 2 · Cost inputs</h2>
+        <p>
+          Enter the main annual costs for this mandate configuration. All costs are in the same currency;
+          you can treat values as per year or per campaign, as long as you stay consistent across scenarios.
+        </p>
+
+        <form id="costs-form" class="form-grid">
+          <div class="form-group">
+            <label for="cost-admin">Administration and delivery cost</label>
+            <input id="cost-admin" type="number" min="0" step="1000" value="0">
+            <p class="hint">Staff time, IT systems, reporting, helpdesk.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="cost-comm">Communication and outreach</label>
+            <input id="cost-comm" type="number" min="0" step="1000" value="0">
+            <p class="hint">Public information, campaigns, support lines.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="cost-enforce">Enforcement and compliance</label>
+            <input id="cost-enforce" type="number" min="0" step="1000" value="0">
+            <p class="hint">Monitoring, checks, penalties, appeals.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="cost-comp">Compensation / support schemes</label>
+            <input id="cost-comp" type="number" min="0" step="1000" value="0">
+            <p class="hint">Injury compensation, hardship support, exemptions processing.</p>
+          </div>
+
+          <div class="form-group form-group-wide">
+            <label for="cost-notes">Cost notes</label>
+            <textarea id="cost-notes" rows="2" placeholder="Optional notes on cost assumptions for this configuration."></textarea>
+          </div>
+        </form>
+
+        <div class="form-actions">
+          <button type="button" id="btn-apply-costs" class="btn-primary-small">Apply costs</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Cost snapshot</h3>
+        <p class="text-muted" id="costs-summary-empty">
+          No costs applied yet.
+        </p>
+        <div id="costs-summary" hidden>
+          <ul class="plain-list">
+            <li><strong>Total cost:</strong> <span id="costs-total"></span></li>
+            <li><strong>Administration and delivery:</strong> <span id="costs-admin"></span></li>
+            <li><strong>Communication and outreach:</strong> <span id="costs-comm"></span></li>
+            <li><strong>Enforcement and compliance:</strong> <span id="costs-enforce"></span></li>
+            <li><strong>Compensation / support:</strong> <span id="costs-comp"></span></li>
+          </ul>
+          <p class="note">
+            Costs are kept simple here so that you can plug in figures from your own costing work or
+            from the separate costing template.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENEFITS TAB -->
+  <section id="benefitsTab" class="tab-panel">
+    <div class="grid-two-stretch">
+      <div class="card">
+        <h2>Step 3 · Benefits and support</h2>
+        <p>
+          Enter the expected health benefits and the value you use for each life saved. If you prefer,
+          you can keep benefits in natural units and focus on costs alone.
+        </p>
+
+        <form id="benefits-form" class="form-grid">
+          <div class="form-group">
+            <label for="benefit-lives">Expected lives saved (per 100,000)</label>
+            <input id="benefit-lives" type="number" min="0" step="0.1" value="0">
+            <p class="hint">Based on your epidemiological modelling or external evidence.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="benefit-value-per-life">Monetary value per life saved</label>
+            <input id="benefit-value-per-life" type="number" min="0" step="1000" value="0">
+            <p class="hint">For example, a value of a statistical life (VSL) figure in local currency.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="benefit-support">Indicative public support (0–100)</label>
+            <input id="benefit-support" type="number" min="0" max="100" step="1" value="50">
+            <p class="hint">Use survey estimates or model outputs if available; otherwise, use a simple judgement.</p>
+          </div>
+
+          <div class="form-group form-group-wide">
+            <label for="benefit-notes">Benefit notes</label>
+            <textarea id="benefit-notes" rows="2" placeholder="Optional notes on benefit and support assumptions."></textarea>
+          </div>
+        </form>
+
+        <div class="form-actions">
+          <button type="button" id="btn-apply-benefits" class="btn-primary-small">Apply benefits</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Benefit snapshot</h3>
+        <p class="text-muted" id="benefits-summary-empty">
+          No benefits applied yet.
+        </p>
+        <div id="benefits-summary" hidden>
+          <ul class="plain-list">
+            <li><strong>Expected lives saved per 100,000:</strong> <span id="benefits-lives"></span></li>
+            <li><strong>Estimated lives saved (total):</strong> <span id="benefits-lives-total"></span></li>
+            <li><strong>Monetary benefit (total):</strong> <span id="benefits-monetary"></span></li>
+            <li><strong>Indicative support:</strong> <span id="benefits-support"></span></li>
+          </ul>
+          <p class="note">
+            Lives saved are calculated as lives per 100,000 multiplied by the population covered in Step 1.
+            Monetary benefit multiplies total lives saved by the value you entered per life saved.
+            Expected public support comes directly from the percentage you enter above; you can calibrate this using the MandEval DCE estimates,
+            where expected lives saved is already one of the attributes shaping acceptance.
+            The tool does not mechanically infer support from the lives-saved number; support and lives saved are kept separate so you can explore different combinations.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS TAB -->
+  <section id="resultsTab" class="tab-panel">
+    <div class="card">
+      <h2>Results and ranking</h2>
+      <p>
+        This table compares all saved scenarios. Scenarios are ranked by benefit–cost ratio. Traffic light
+        colours highlight benefit–cost performance and indicative support.
+      </p>
+      <div class="table-wrapper">
+        <table class="data-table" id="results-table">
+          <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Label</th>
+            <th>Country</th>
+            <th>Outbreak</th>
+            <th>Scope</th>
+            <th>Coverage</th>
+            <th>Total cost</th>
+            <th>Total benefit</th>
+            <th>BCR</th>
+            <th>Support</th>
+          </tr>
+          </thead>
+          <tbody>
+          <!-- Filled dynamically -->
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        A BCR above 1 indicates that monetary benefits exceed costs under your assumptions. Support values are
+        indicative only and depend on the inputs you provide.
+      </p>
+    </div>
+  </section>
+
+  <!-- SAVED SCENARIOS TAB -->
+  <section id="scenariosTab" class="tab-panel">
+    <div class="card">
+      <h2>Saved scenarios</h2>
+      <p>
+        Each time you save a scenario, it appears here. You can remove scenarios or export them later.
+      </p>
+      <div class="table-wrapper">
+        <table class="data-table" id="scenarios-table">
+          <thead>
+          <tr>
+            <th>#</th>
+            <th>Label</th>
+            <th>Country</th>
+            <th>Outbreak</th>
+            <th>Scope</th>
+            <th>Exemptions</th>
+            <th>Coverage</th>
+            <th>Total cost</th>
+            <th>Total benefit</th>
+            <th>BCR</th>
+            <th>Support</th>
+            <th>Remove</th>
+          </tr>
+          </thead>
+          <tbody>
+          <!-- Filled dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- BRIEFINGS TAB -->
+  <section id="briefingsTab" class="tab-panel">
+    <div class="grid-two-stretch">
+      <div class="card">
+        <h2>Briefing text</h2>
+        <p>
+          This text summarises the most recent configuration and can be copied into emails, meeting notes
+          or short policy briefs.
+        </p>
+        <textarea id="briefing-text" rows="10" class="briefing-textarea"
+                  placeholder="Apply configuration, costs and benefits to generate a briefing summary."></textarea>
+        <div class="form-actions">
+          <button type="button" id="btn-copy-briefing" class="btn-primary-small">Copy briefing text</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>AI briefing prompts</h2>
+        <p>
+          These buttons prepare prompts for Microsoft Copilot or ChatGPT based on your latest scenario and
+          copy them to the clipboard.
+        </p>
+        <div class="form-actions">
+          <button type="button" id="btn-open-copilot" class="btn-secondary">Copy prompt and open Copilot</button>
+          <button type="button" id="btn-open-chatgpt" class="btn-secondary">Copy prompt and open ChatGPT</button>
+        </div>
+        <p class="note">
+          The prompts include a plain-language description of the mandate, costs, benefits and support.
+          You can then ask the AI assistant to draft a policy note, slide or speech segment.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ATTRIBUTES TAB -->
+  <section id="attributesTab" class="tab-panel">
+    <div class="card">
+      <h2>Mandate attributes and levels</h2>
+      <p>This page summarises the policy levers used in the tool, in plain language.</p>
+      <ul>
+        <li><strong>Scope of the mandate</strong>: high-risk occupations only vs all occupations and public spaces.</li>
+        <li><strong>Exemptions</strong>: medical only; medical + religious; or medical + religious + personal reasons.</li>
+        <li><strong>Coverage threshold</strong>: vaccination coverage level required to lift the mandate (for example 70% or 90%).</li>
+        <li><strong>Expected lives saved</strong>: the expected number of deaths averted per 100,000 people in the covered population over the chosen time horizon.</li>
+      </ul>
+      <p>Countries can interpret these levels in light of their own frameworks (for example, which occupations are considered high risk, and how exemptions are documented).</p>
+    </div>
+  </section>
+
+  <!-- EVIDENCE TAB -->
+  <section id="evidenceTab" class="tab-panel">
+    <div class="card">
+      <h2>Evidence and parameter choices</h2>
+      <p>The tool does not come with fixed official numbers. Instead, it provides a structure for combining:</p>
+      <ul>
+        <li>Preference evidence from stated preference studies on vaccine mandate design.</li>
+        <li>Cost inputs from programme budgets, test price caps, and administrative cost data.</li>
+        <li>Benefit inputs from epidemiological modelling and values used in regulatory impact analysis.</li>
+      </ul>
+      <p>Each cost and benefit input has a short description next to it. You can record the source, year and currency directly in your own working files or in the accompanying technical appendix.</p>
+      <p>For more detail on the categories of costs and benefits, see the <a href="technical-appendix.html" target="_blank" rel="noopener noreferrer">technical appendix</a>.</p>
+    </div>
+  </section>
+
+  <!-- EXPORT TAB -->
+  <section id="exportTab" class="tab-panel">
+    <div class="grid-two">
+      <div class="card">
+        <h2>Export data</h2>
+        <p>You can export the saved scenarios for further analysis or archiving.</p>
+        <div class="form-row">
+          <button type="button" id="btnExportExcel" class="btn-secondary">Export scenarios to Excel</button>
+        </div>
+        <div class="form-row">
+          <button type="button" id="btnExportPdf" class="btn-secondary">Export technical PDF (summary)</button>
+        </div>
+        <p class="help">The Excel export includes all saved scenarios with their main cost and benefit inputs. The technical PDF export produces a short summary with the current configuration and the top ranked options.</p>
+      </div>
+      <div class="card">
+        <h2>Clear local data</h2>
+        <p>This tool stores your configurations only in your browser (local storage). Use the button below if you want to clear all saved scenarios on this device.</p>
+        <div class="form-row">
+          <button type="button" id="btnClearStorage" class="btn-tertiary">Clear saved scenarios from this browser</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Toast container -->
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+</body>
+</html>

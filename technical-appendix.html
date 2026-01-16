@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MANDEVAL Technical Appendix – Cost and Benefit Parameters</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #1f2933;
+      line-height: 1.6;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 1.8rem 1.2rem 2.4rem;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin: 0 0 0.6rem;
+      color: #0b5ba7;
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin-top: 1.6rem;
+      margin-bottom: 0.4rem;
+      color: #0b5ba7;
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin-top: 1.1rem;
+      margin-bottom: 0.3rem;
+      color: #0f4c81;
+    }
+    p {
+      margin: 0.4rem 0;
+    }
+    ul, ol {
+      margin: 0.4rem 0 0.7rem;
+      padding-left: 1.2rem;
+    }
+    .note {
+      border-left: 4px solid #0b5ba7;
+      background: #f3f6fb;
+      padding: 0.5rem 0.8rem;
+      border-radius: 0.4rem;
+      margin: 0.8rem 0;
+      font-size: 0.9rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.7rem 0 1.1rem;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid #d0d7e2;
+      padding: 0.35rem 0.45rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f4f6fb;
+      font-weight: 600;
+    }
+    tbody tr:nth-child(even) td {
+      background: #fafbff;
+    }
+    .small {
+      font-size: 0.85rem;
+      color: #5f6c80;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>MANDEVAL Technical Appendix</h1>
+    <p class="small">
+      This appendix explains how the MANDEVAL tool organises cost and benefit inputs. It is
+      written so that you can plug in your own best estimates and update them over time.
+      No values are hard coded in the tool; all defaults can be replaced by country teams.
+    </p>
+  </header>
+
+  <section>
+    <h2>1. Cost parameters</h2>
+    <p>
+      The tool keeps the cost structure deliberately simple and transparent. All costs are entered
+      in the same currency, usually per year for a given mandate design:
+    </p>
+    <table>
+      <thead>
+      <tr>
+        <th>Cost item</th>
+        <th>Examples</th>
+        <th>How MANDEVAL uses it</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td>Administration and delivery</td>
+        <td>
+          Staff time to administer mandates, maintain registers, update IT systems,
+          respond to queries and issue certificates or QR codes.
+        </td>
+        <td>
+          Entered as a single amount in the <em>Costs</em> tab and added directly to total cost.
+        </td>
+      </tr>
+      <tr>
+        <td>Communication and outreach</td>
+        <td>
+          Public information campaigns, hotline services, community engagement,
+          translation and accessible formats.
+        </td>
+        <td>
+          Entered as a single amount and added to total cost. You can separate recurring
+          and one-off activities in your own costing sheet if useful.
+        </td>
+      </tr>
+      <tr>
+        <td>Enforcement and compliance</td>
+        <td>
+          Inspection, compliance checks, appeals, legal and administrative procedures
+          related to non-compliance.
+        </td>
+        <td>
+          Entered as a single amount and added to total cost. It can be set to zero if
+          enforcement is minimal or handled under existing budgets.
+        </td>
+      </tr>
+      <tr>
+        <td>Compensation and support</td>
+        <td>
+          Compensation schemes for vaccine injury, hardship support for people who lose work
+          because of mandates, and costs of processing exemption requests.
+        </td>
+        <td>
+          Entered as a single amount and added to total cost. It can be treated as a pooled
+          fund if individual payments are uncertain.
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    <p>
+      The tool calculates <strong>total cost</strong> as the sum of these four components.
+      Countries can align each item with a more detailed costing template if they wish.
+    </p>
+  </section>
+
+  <section>
+    <h2>2. Benefit parameters</h2>
+    <p>
+      MANDEVAL focuses on one main health outcome: lives saved due to higher vaccine coverage
+      under a mandate compared with a reference situation. Users provide the key inputs:
+    </p>
+    <table>
+      <thead>
+      <tr>
+        <th>Benefit item</th>
+        <th>Definition</th>
+        <th>How MANDEVAL uses it</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td>Lives saved per 100,000</td>
+        <td>
+          Expected reduction in deaths per 100,000 people in the covered population due to the
+          mandate. This should come from your own epidemiological modelling or external evidence.
+        </td>
+        <td>
+          Combined with the population covered in the configuration step to estimate total
+          lives saved for the scenario.
+        </td>
+      </tr>
+      <tr>
+        <td>Monetary value per life saved</td>
+        <td>
+          The monetary value used by your country team for one life saved. This may be based
+          on a value of a statistical life (VSL), value of a life year (VOLY) or other national
+          guidance on valuing mortality reductions.
+        </td>
+        <td>
+          Multiplied by total lives saved to obtain the total monetary benefit for the scenario.
+          If you prefer not to monetise lives saved, you can set this to zero and focus on
+          natural units.
+        </td>
+      </tr>
+      <tr>
+        <td>Indicative public support</td>
+        <td>
+          A simple 0–100 index representing expected public support or acceptability
+          for the mandate design. This can come from survey data, preference studies or
+          expert judgement.
+        </td>
+        <td>
+          Used for traffic-light signalling and ranking. It does not enter the benefit–cost
+          ratio directly but helps distinguish otherwise similar scenarios.
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. Derived indicators</h2>
+    <p>
+      Once costs and benefits are entered, the tool computes:
+    </p>
+    <ul>
+      <li><strong>Total lives saved</strong> as lives saved per 100,000 multiplied by the population
+        covered in the scenario.</li>
+      <li><strong>Total monetary benefit</strong> as total lives saved multiplied by the monetary
+        value per life saved.</li>
+      <li><strong>Benefit–cost ratio (BCR)</strong> as total monetary benefit divided by total cost,
+        when both are positive.</li>
+    </ul>
+    <p class="note">
+      Countries can adjust the underlying values over time as new evidence emerges. The purpose
+      of the tool is to make these assumptions visible and easy to modify, not to embed any fixed
+      global benchmark.
+    </p>
+  </section>
+</main>
+</body>
+</html>
