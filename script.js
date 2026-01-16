@@ -11,10 +11,136 @@
     scenarios: []
   };
 
+  // Mixed logit (MXL) mean coefficients from MandEval DCE
+  // Coefficients are country- and outbreak-specific.
+  // Lives-saved term is per 100,000 people.
+  const mxlCoefs = {
+    AU: {
+      mild: {
+        ascPolicy: 0.464,
+        ascOptout: -0.572,
+        scopeAll: -0.319,
+        exMedRel: -0.157,
+        exMedRelPers: -0.267,
+        cov70: 0.171,
+        cov90: 0.158,
+        lives: 0.072
+      },
+      severe: {
+        ascPolicy: 0.535,
+        ascOptout: -0.694,
+        scopeAll: 0.190,
+        exMedRel: -0.181,
+        exMedRelPers: -0.305,
+        cov70: 0.371,
+        cov90: 0.398,
+        lives: 0.079
+      }
+    },
+    IT: {
+      mild: {
+        ascPolicy: 0.625,
+        ascOptout: -0.238,
+        scopeAll: -0.276,
+        exMedRel: -0.176,
+        exMedRelPers: -0.289,
+        cov70: 0.185,
+        cov90: 0.148,
+        lives: 0.039
+      },
+      severe: {
+        ascPolicy: 0.799,
+        ascOptout: -0.463,
+        scopeAll: 0.174,
+        exMedRel: -0.178,
+        exMedRelPers: -0.207,
+        cov70: 0.305,
+        cov90: 0.515,
+        lives: 0.045
+      }
+    },
+    FR: {
+      mild: {
+        ascPolicy: 0.899,
+        ascOptout: 0.307,
+        scopeAll: -0.160,
+        exMedRel: -0.121,
+        exMedRelPers: -0.124,
+        cov70: 0.232,
+        cov90: 0.264,
+        lives: 0.049
+      },
+      severe: {
+        ascPolicy: 0.884,
+        ascOptout: 0.083,
+        scopeAll: -0.019,
+        exMedRel: -0.192,
+        exMedRelPers: -0.247,
+        cov70: 0.267,
+        cov90: 0.398,
+        lives: 0.052
+      }
+    }
+  };
+
+  /**
+   * Compute model-based public support (%) for the current configuration
+   * using the MXL mean coefficients, treating the problem as a binary
+   * choice between "mandate as configured" and "no mandate".
+   */
+  function computeSupportFromMXL(){
+    const cfg = state.config;
+    const ben = state.benefits;
+    if (!cfg || !ben) return null;
+
+    const cc = mxlCoefs[cfg.country];
+    if (!cc) return null;
+    const frame = cfg.outbreak === 'severe' ? 'severe' : 'mild';
+    const cf = cc[frame];
+    if (!cf) return null;
+
+    // Attribute coding relative to MandEval DCE structure
+    const scopeAll = cfg.scope === 'all' ? 1 : 0;
+
+    let exMedRel = 0;
+    let exMedRelPers = 0;
+    if (cfg.exemptions === 'medrel') {
+      exMedRel = 1;
+    } else if (cfg.exemptions === 'medrelpers') {
+      exMedRelPers = 1;
+    }
+
+    let cov70 = 0;
+    let cov90 = 0;
+    if (cfg.coverage === 70) {
+      cov70 = 1;
+    } else if (cfg.coverage === 90) {
+      cov90 = 1;
+    }
+    const lives = ben.livesPer100k || 0;
+
+    // Utility of mandate vs no mandate
+    const U_mand = cf.ascPolicy
+      + cf.scopeAll * scopeAll
+      + cf.exMedRel * exMedRel
+      + cf.exMedRelPers * exMedRelPers
+      + cf.cov70 * cov70
+      + cf.cov90 * cov90
+      + cf.lives * lives;
+
+    const U_no = cf.ascOptout;
+
+    const expMand = Math.exp(Math.max(Math.min(U_mand, 40), -40));
+    const expNo = Math.exp(Math.max(Math.min(U_no, 40), -40));
+
+    const pMand = expMand / (expMand + expNo);
+    if (!isFinite(pMand)) return null;
+    return pMand * 100;
+  }
+
   function formatMoney(value){
     if (value == null || isNaN(value)) return '–';
     const v = Number(value);
-    if (!isFinite(v)) return '–';
     if (Math.abs(v) >= 1_000_000_000) {
       return (v/1_000_000_000).toFixed(2) + ' B';
     }
@@ -36,123 +162,127 @@
     const container = $('#toast-container');
     if (!container) return;
 
-    const div = document.createElement('div');
-    div.className = 'toast';
+    const toast = document.createElement('div');
+    toast.className = 'toast';
 
-    if (type === 'success') div.classList.add('toast-success');
-    else if (type === 'warning') div.classList.add('toast-warning');
-    else if (type === 'error') div.classList.add('toast-error');
+    if (type === 'success') toast.classList.add('toast-success');
+    else if (type === 'warning') toast.classList.add('toast-warning');
+    else if (type === 'error') toast.classList.add('toast-error');
+    else toast.classList.add('toast-warning');
 
-    const span = document.createElement('span');
-    span.className = 'toast-message';
-    span.textContent = message;
+    const msg = document.createElement('div');
+    msg.className = 'toast-message';
+    msg.textContent = message;
 
-    const btn = document.createElement('button');
-    btn.className = 'toast-close';
-    btn.type = 'button';
-    btn.textContent = '×';
-    btn.addEventListener('click', () => {
-      container.removeChild(div);
-    });
-
-    div.appendChild(span);
-    div.appendChild(btn);
-    container.appendChild(div);
+    toast.appendChild(msg);
+    container.appendChild(toast);
 
     setTimeout(() => {
-      if (container.contains(div)) {
-        container.removeChild(div);
-      }
-    }, 4500);
+      toast.style.opacity = '0';
+      setTimeout(() => container.removeChild(toast), 300);
+    }, 2800);
   }
 
   function switchTab(tabId){
-    $$('.tab-link').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.tab === tabId);
-    });
     $$('.tab-panel').forEach(p => {
       p.classList.toggle('active', p.id === tabId);
     });
-  }
-
-  function initTabs(){
-    $$('.tab-link').forEach(btn => {
-      btn.addEventListener('click', () => {
-        switchTab(btn.dataset.tab);
-      });
+    $$('.tab-link').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === tabId);
     });
-  }
-
-  function readConfigForm(){
-    const country = $('#cfg-country').value;
-    const outbreak = $('#cfg-outbreak').value;
-    const scope = $('#cfg-scope').value;
-    const exemptions = $('#cfg-exemptions').value;
-    const coverage = parseFloat($('#cfg-coverage').value || '0');
-    const popMillions = parseFloat($('#cfg-pop').value || '0');
-    const label = ($('#cfg-notes').value || '').trim();
-
-    return { country, outbreak, scope, exemptions, coverage, popMillions, label };
-  }
-
-  function applyConfig(){
-    const cfg = readConfigForm();
-    if (!cfg.country){
-      showToast('Please select a country before applying the configuration.', 'warning');
-      switchTab('configTab');
-      return;
-    }
-    if (!cfg.popMillions || cfg.popMillions <= 0){
-      showToast('Please set the population covered (Step 1).', 'warning');
-      switchTab('configTab');
-      return;
-    }
-    state.config = cfg;
-    updateConfigSummary();
-    updateDerivedAndBriefing();
-    showToast('Configuration applied.', 'success');
-  }
-
-  function updateConfigSummary(){
-    const empty = $('#cfg-summary-empty');
-    const panel = $('#cfg-summary');
-    if (!state.config){
-      empty.hidden = false;
-      panel.hidden = true;
-      return;
-    }
-    const c = state.config;
-    empty.hidden = true;
-    panel.hidden = false;
-    $('#cfg-summary-country').textContent = countryLabel(c.country);
-    $('#cfg-summary-outbreak').textContent = c.outbreak === 'severe' ? 'Severe outbreak' : 'Mild outbreak';
-    $('#cfg-summary-scope').textContent = scopeLabel(c.scope);
-    $('#cfg-summary-exemptions').textContent = exemptionsLabel(c.exemptions);
-    $('#cfg-summary-coverage').textContent = (c.coverage * 100).toFixed(0) + '%';
-    $('#cfg-summary-pop').textContent = c.popMillions.toFixed(1) + ' million';
   }
 
   function countryLabel(code){
     if (code === 'AU') return 'Australia';
     if (code === 'FR') return 'France';
     if (code === 'IT') return 'Italy';
-    return code || 'Not set';
+    return code;
+  }
+
+  function outbreakLabel(code){
+    if (code === 'mild') return 'Mild outbreak';
+    if (code === 'severe') return 'Severe outbreak';
+    return code;
   }
 
   function scopeLabel(code){
+    if (code === 'highrisk') return 'High-risk only';
     if (code === 'all') return 'All occupations and public spaces';
-    return 'High-risk occupations only';
+    return code;
   }
 
   function exemptionsLabel(code){
+    if (code === 'medical') return 'Medical only';
     if (code === 'medrel') return 'Medical + religious';
     if (code === 'medrelpers') return 'Medical + religious + personal';
-    return 'Medical only';
+    return code;
   }
+
+  function defaultScenarioLabel(cfg){
+    return [
+      countryLabel(cfg.country),
+      outbreakLabel(cfg.outbreak).toLowerCase(),
+      scopeLabel(cfg.scope).toLowerCase(),
+      exemptionsLabel(cfg.exemptions).toLowerCase(),
+      `${cfg.coverage}% threshold`
+    ].join(' – ');
+  }
+
+  // CONFIGURATION
+
+  function applyConfig(){
+    const country = $('#cfg-country').value;
+    const outbreak = $('#cfg-outbreak').value;
+    const scope = $('#cfg-scope').value;
+    const exemptions = $('#cfg-exemptions').value;
+    const coverage = parseFloat($('#cfg-coverage').value || '0');
+    const popMillions = parseFloat($('#cfg-pop').value || '0');
+    const label = ($('#cfg-label').value || '').trim();
+
+    if (!country || !outbreak || !scope || !exemptions || !coverage || !popMillions){
+      showToast('Please complete all configuration fields before applying.', 'warning');
+      return;
+    }
+
+    state.config = {
+      country,
+      outbreak,
+      scope,
+      exemptions,
+      coverage,
+      popMillions,
+      label
+    };
+
+    updateConfigSummary();
+    updateDerivedAndBriefing();
+    showToast('Configuration applied.', 'success');
+  }
+
+  function updateConfigSummary(){
+    const empty = $('#config-summary-empty');
+    const panel = $('#config-summary');
+    if (!state.config){
+      if (empty) empty.classList.remove('hidden');
+      if (panel) panel.classList.add('hidden');
+      return;
+    }
+    if (empty) empty.classList.add('hidden');
+    if (panel) panel.classList.remove('hidden');
+
+    $('#summary-country').textContent = countryLabel(state.config.country);
+    $('#summary-outbreak').textContent = outbreakLabel(state.config.outbreak);
+    $('#summary-scope').textContent = scopeLabel(state.config.scope);
+    $('#summary-exemptions').textContent = exemptionsLabel(state.config.exemptions);
+    $('#summary-coverage').textContent = `${state.config.coverage}%`;
+    $('#summary-pop').textContent = `${state.config.popMillions.toFixed(1)} M`;
+  }
+
+  // COSTS
 
   function applyCosts(){
     if (!state.config){
-      showToast('Apply a configuration first (Step 1).', 'warning');
+      showToast('Apply a configuration first.', 'warning');
       switchTab('configTab');
       return;
     }
@@ -172,36 +302,49 @@
   function updateCostsSummary(){
     const empty = $('#costs-summary-empty');
     const panel = $('#costs-summary');
+
     if (!state.costs){
-      empty.hidden = false;
-      panel.hidden = true;
+      if (empty) empty.classList.remove('hidden');
+      if (panel) panel.classList.add('hidden');
       return;
     }
-    empty.hidden = true;
-    panel.hidden = false;
-    $('#costs-total').textContent = formatMoney(state.costs.total);
+    if (empty) empty.classList.add('hidden');
+    if (panel) panel.classList.remove('hidden');
+
     $('#costs-admin').textContent = formatMoney(state.costs.admin);
     $('#costs-comm').textContent = formatMoney(state.costs.comm);
     $('#costs-enforce').textContent = formatMoney(state.costs.enforce);
     $('#costs-comp').textContent = formatMoney(state.costs.comp);
+    $('#costs-total').textContent = formatMoney(state.costs.total);
   }
+
+  // BENEFITS AND SUPPORT
 
   function applyBenefits(){
     if (!state.config){
-      showToast('Apply a configuration first (Step 1).', 'warning');
+      showToast('Apply a configuration first.', 'warning');
       switchTab('configTab');
       return;
     }
     const livesPer100k = parseFloat($('#benefit-lives').value || '0');
     const valuePerLife = parseFloat($('#benefit-value-per-life').value || '0');
-    const support = parseFloat($('#benefit-support').value || '0');
     const notes = ($('#benefit-notes').value || '').trim();
 
     const pop = state.config.popMillions * 1_000_000;
     const livesTotal = livesPer100k * (pop / 100_000);
     const monetary = livesTotal * valuePerLife;
 
-    state.benefits = { livesPer100k, valuePerLife, support, livesTotal, monetary, notes };
+    state.benefits = { livesPer100k, valuePerLife, livesTotal, monetary, notes, support: null };
+
+    const modelSupport = computeSupportFromMXL();
+    if (modelSupport != null){
+      state.benefits.support = modelSupport;
+      const supportInput = $('#benefit-support');
+      if (supportInput){
+        supportInput.value = modelSupport.toFixed(1);
+      }
+    }
+
     updateBenefitsSummary();
     updateDerivedAndBriefing();
     showToast('Benefits applied.', 'success');
@@ -210,18 +353,26 @@
   function updateBenefitsSummary(){
     const empty = $('#benefits-summary-empty');
     const panel = $('#benefits-summary');
-    if (!state.benefits || !state.config){
-      empty.hidden = false;
-      panel.hidden = true;
+
+    if (!state.benefits){
+      if (empty) empty.classList.remove('hidden');
+      if (panel) panel.classList.add('hidden');
       return;
     }
-    empty.hidden = true;
-    panel.hidden = false;
-    $('#benefits-lives').textContent = state.benefits.livesPer100k.toFixed(2);
-    $('#benefits-lives-total').textContent = state.benefits.livesTotal.toFixed(0);
+    if (empty) empty.classList.add('hidden');
+    if (panel) panel.classList.remove('hidden');
+
+    $('#benefits-lives-per-100k').textContent =
+      isNaN(state.benefits.livesPer100k) ? '–' : state.benefits.livesPer100k.toFixed(1);
+    $('#benefits-lives-total').textContent =
+      isNaN(state.benefits.livesTotal) ? '–' : state.benefits.livesTotal.toFixed(0);
     $('#benefits-monetary').textContent = formatMoney(state.benefits.monetary);
-    $('#benefits-support').textContent = formatPercent(state.benefits.support);
+
+    const s = state.benefits.support;
+    $('#benefits-support').textContent = (s == null || isNaN(s)) ? '–' : formatPercent(s);
   }
+
+  // BCR AND HEADLINE
 
   function computeBCR(){
     if (!state.costs || !state.benefits) return null;
@@ -230,49 +381,116 @@
   }
 
   function updateDerivedAndBriefing(){
-    const bcr = computeBCR();
-    if (!state.config) return;
+    const headline = $('#headline-recommendation');
+    const briefing = $('#briefing-text');
 
-    const c = state.config;
+    if (!headline || !briefing){
+      return;
+    }
+
+    if (!state.config){
+      headline.innerHTML = '<p class="placeholder">No assessment yet. Apply a configuration and benefits.</p>';
+      briefing.value = '';
+      return;
+    }
+
+    const bcr = computeBCR();
+    const cfg = state.config;
     const costs = state.costs;
     const ben = state.benefits;
 
     const parts = [];
-    parts.push(`Country: ${countryLabel(c.country)}; outbreak scenario: ${c.outbreak === 'severe' ? 'severe' : 'mild'}.`);
-    parts.push(`Mandate scope: ${scopeLabel(c.scope)}, exemptions: ${exemptionsLabel(c.exemptions)}, target coverage ${ (c.coverage * 100).toFixed(0) }% of about ${c.popMillions.toFixed(1)} million people.`);
+    parts.push(
+      `${countryLabel(cfg.country)} – ${outbreakLabel(cfg.outbreak)}: ` +
+      `${scopeLabel(cfg.scope).toLowerCase()} with ${exemptionsLabel(cfg.exemptions).toLowerCase()} ` +
+      `and a ${cfg.coverage}% coverage threshold, applied to about ${cfg.popMillions.toFixed(1)} million people.`
+    );
+
     if (costs){
-      parts.push(`Estimated total implementation cost is about ${formatMoney(costs.total)} (administration ${formatMoney(costs.admin)}, communication ${formatMoney(costs.comm)}, enforcement ${formatMoney(costs.enforce)}, compensation and support ${formatMoney(costs.comp)}).`);
+      parts.push(
+        `Estimated total programme cost is about ${formatMoney(costs.total)} in direct ` +
+        `administration, communication, enforcement and compensation.`
+      );
     }
+
     if (ben){
-      parts.push(`Under current assumptions, the mandate is expected to save about ${ben.livesTotal.toFixed(0)} lives in the covered population ( ${ben.livesPer100k.toFixed(2)} per 100,000 ), valued at roughly ${formatMoney(ben.monetary)} in monetary terms.`);
-      parts.push(`Indicative public support is set at ${formatPercent(ben.support)} based on available evidence or judgement.`);
+      parts.push(
+        `Under current assumptions, the mandate is expected to avoid around ` +
+        `${ben.livesTotal.toFixed(0)} deaths over the period considered ` +
+        `(about ${ben.livesPer100k.toFixed(1)} lives saved per 100,000 people), ` +
+        `with a monetary benefit of roughly ${formatMoney(ben.monetary)}.`
+      );
+
+      if (ben.support != null && !isNaN(ben.support)){
+        parts.push(
+          `Model-based public support for this mandate design is approximately ` +
+          `${formatPercent(ben.support)}, based on the MandEval mixed logit estimates.`
+        );
+      }
     }
+
     if (bcr != null){
-      parts.push(`This implies a benefit–cost ratio of approximately ${bcr.toFixed(2)} under the current assumptions.`);
-    } else {
-      parts.push('A benefit–cost ratio cannot yet be calculated because costs or benefits are missing.');
+      parts.push(
+        `This implies a benefit–cost ratio (BCR) of about ${bcr.toFixed(2)}.`
+      );
     }
 
-    $('#briefing-text').value = parts.join('\n\n');
+    const bcrText = (bcr == null)
+      ? 'Insufficient information to compute BCR.'
+      : (bcr >= 1.5
+        ? 'Strong net benefit under current assumptions.'
+        : (bcr >= 1.0
+          ? 'Modest net benefit; sensitive to assumptions.'
+          : 'Net benefits are uncertain or low under current assumptions.'));
 
-    rebuildResultsTable();
+    let supportText = '';
+    if (state.benefits && state.benefits.support != null && !isNaN(state.benefits.support)){
+      const s = state.benefits.support;
+      if (s >= 70){
+        supportText = 'Public support is expected to be relatively high.';
+      } else if (s >= 50){
+        supportText = 'Public support is expected to be moderate and potentially contested.';
+      } else {
+        supportText = 'Public support is expected to be limited; careful risk communication is needed.';
+      }
+    }
+
+    headline.innerHTML =
+      '<p>' + bcrText + '</p>' +
+      (supportText ? ('<p>' + supportText + '</p>') : '');
+
+    briefing.value = parts.join(' ');
   }
 
-  function viewSummary(){
-    if (!state.config){
-      showToast('Apply a configuration first (Step 1).', 'warning');
-      switchTab('configTab');
-      return;
-    }
-    switchTab('resultsTab');
-    showToast('Showing results and ranking.', 'success');
+  // SCENARIOS
+
+  function feasibilityFlag(support){
+    if (support == null || isNaN(support)) return 'Unknown';
+    if (support >= 70) return 'Favourable';
+    if (support >= 50) return 'Mixed';
+    return 'Challenging';
   }
 
   function saveScenario(){
-    if (!state.config || !state.costs || !state.benefits){
-      showToast('Apply configuration, costs and benefits before saving a scenario.', 'warning');
+    if (!state.config){
+      showToast('Apply configuration before saving a scenario.', 'warning');
+      switchTab('configTab');
       return;
     }
+
+    // If costs or benefits have not yet been applied, try to apply them
+    if (!state.costs){
+      applyCosts();
+    }
+    if (!state.benefits){
+      applyBenefits();
+    }
+
+    if (!state.costs || !state.benefits){
+      showToast('Please review costs and benefits – some required values are still missing.', 'warning');
+      return;
+    }
+
     const bcr = computeBCR();
     const s = {
       id: Date.now(),
@@ -290,300 +508,351 @@
     };
     state.scenarios.push(s);
     rebuildScenariosTable();
-    rebuildResultsTable();
-    showToast('Scenario saved for comparison.', 'success');
-  }
-
-  function defaultScenarioLabel(cfg){
-    return `${countryLabel(cfg.country)}, ${cfg.outbreak === 'severe' ? 'severe' : 'mild'}, ${scopeLabel(cfg.scope)}, ${ (cfg.coverage * 100).toFixed(0) }%`;
+    rebuildResultsTable(state.scenarios);
+    showToast('Scenario saved.', 'success');
   }
 
   function rebuildScenariosTable(){
-    const tbody = $('#scenarios-table tbody');
-    tbody.innerHTML = '';
-    state.scenarios.forEach((s, idx) => {
+    const tbody = $('#scenarios-table-body');
+    const emptyRow = $('#scenarios-empty-row');
+    if (!tbody) return;
+
+    if (!state.scenarios.length){
+      if (emptyRow) emptyRow.style.display = '';
+      tbody.querySelectorAll('tr').forEach(tr => {
+        if (tr !== emptyRow) tr.remove();
+      });
+      return;
+    }
+
+    if (emptyRow) emptyRow.style.display = 'none';
+    tbody.querySelectorAll('tr').forEach(tr => {
+      if (tr !== emptyRow) tr.remove();
+    });
+
+    state.scenarios.forEach(s => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(s.label)}</td>
+        <td>${s.label}</td>
         <td>${countryLabel(s.country)}</td>
-        <td>${s.outbreak === 'severe' ? 'Severe' : 'Mild'}</td>
+        <td>${outbreakLabel(s.outbreak)}</td>
         <td>${scopeLabel(s.scope)}</td>
         <td>${exemptionsLabel(s.exemptions)}</td>
-        <td>${(s.coverage * 100).toFixed(0)}%</td>
+        <td>${s.coverage}%</td>
         <td>${formatMoney(s.totalCost)}</td>
         <td>${formatMoney(s.totalBenefit)}</td>
-        <td>${s.bcr != null ? s.bcr.toFixed(2) : '–'}</td>
-        <td>${formatPercent(s.support)}</td>
-        <td><button type="button" data-id="${s.id}" class="btn-ghost btn-remove-scenario">Remove</button></td>
+        <td>${s.bcr == null ? '–' : s.bcr.toFixed(2)}</td>
+        <td>${s.support == null ? '–' : formatPercent(s.support)}</td>
       `;
       tbody.appendChild(tr);
     });
-
-    $$('.btn-remove-scenario').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = Number(btn.getAttribute('data-id'));
-        state.scenarios = state.scenarios.filter(s => s.id !== id);
-        rebuildScenariosTable();
-        rebuildResultsTable();
-        showToast('Scenario removed.', 'success');
-      });
-    });
   }
 
-  function rebuildResultsTable(){
-    const tbody = $('#results-table tbody');
+  function rebuildResultsTable(scenarios){
+    const tbody = $('#results-table-body');
+    const emptyRow = $('#results-empty-row');
     if (!tbody) return;
-    tbody.innerHTML = '';
-    if (!state.scenarios.length) return;
-    const sorted = [...state.scenarios].sort((a,b) => {
-      const aBCR = a.bcr ?? -Infinity;
-      const bBCR = b.bcr ?? -Infinity;
-      return bBCR - aBCR;
+
+    if (!scenarios || !scenarios.length){
+      if (emptyRow) emptyRow.style.display = '';
+      tbody.querySelectorAll('tr').forEach(tr => {
+        if (tr !== emptyRow) tr.remove();
+      });
+      return;
+    }
+
+    if (emptyRow) emptyRow.style.display = 'none';
+    tbody.querySelectorAll('tr').forEach(tr => {
+      if (tr !== emptyRow) tr.remove();
+    });
+
+    const sorted = [...scenarios].sort((a, b) => {
+      const aBcr = a.bcr ?? -Infinity;
+      const bBcr = b.bcr ?? -Infinity;
+      if (bBcr !== aBcr) return bBcr - aBcr;
+      const aSup = a.support ?? -Infinity;
+      const bSup = b.support ?? -Infinity;
+      return bSup - aSup;
     });
 
     sorted.forEach((s, idx) => {
       const tr = document.createElement('tr');
-      const bcrClass = s.bcr != null && s.bcr >= 1 ? 'bcr-good' : 'bcr-low';
-      const supportClass = s.support >= 60 ? 'support-good' : (s.support >= 40 ? 'support-mid' : 'support-low');
+      const feas = feasibilityFlag(s.support);
       tr.innerHTML = `
         <td>${idx + 1}</td>
-        <td>${escapeHtml(s.label)}</td>
+        <td>${s.label}</td>
         <td>${countryLabel(s.country)}</td>
-        <td>${s.outbreak === 'severe' ? 'Severe' : 'Mild'}</td>
+        <td>${outbreakLabel(s.outbreak)}</td>
         <td>${scopeLabel(s.scope)}</td>
-        <td>${(s.coverage * 100).toFixed(0)}%</td>
+        <td>${exemptionsLabel(s.exemptions)}</td>
+        <td>${s.coverage}%</td>
         <td>${formatMoney(s.totalCost)}</td>
         <td>${formatMoney(s.totalBenefit)}</td>
-        <td class="${bcrClass}">${s.bcr != null ? s.bcr.toFixed(2) : '–'}</td>
-        <td class="${supportClass}">${formatPercent(s.support)}</td>
+        <td>${s.bcr == null ? '–' : s.bcr.toFixed(2)}</td>
+        <td>${s.support == null ? '–' : formatPercent(s.support)}</td>
+        <td>${feas}</td>
       `;
       tbody.appendChild(tr);
     });
   }
 
-  function escapeHtml(str){
-    if (!str) return '';
-    return str.replace(/[&<>"']/g, function(m){
-      switch(m){
-        case '&': return '&amp;';
-        case '<': return '&lt;';
-        case '>': return '&gt;';
-        case '"': return '&quot;';
-        case "'": return '&#39;';
-        default: return m;
-      }
+  // EXPORTS
+
+  function exportScenariosCSV(){
+    if (!state.scenarios.length){
+      showToast('No scenarios to export.', 'warning');
+      return;
+    }
+    const rows = [
+      [
+        'Label','Country','Outbreak','Scope','Exemptions','Coverage',
+        'Population (M)','Total cost','Total benefit','BCR','Support'
+      ]
+    ];
+    state.scenarios.forEach(s => {
+      rows.push([
+        s.label,
+        countryLabel(s.country),
+        outbreakLabel(s.outbreak),
+        scopeLabel(s.scope),
+        exemptionsLabel(s.exemptions),
+        s.coverage,
+        s.popMillions,
+        s.totalCost,
+        s.totalBenefit,
+        s.bcr == null ? '' : s.bcr.toFixed(3),
+        s.support == null ? '' : s.support.toFixed(1)
+      ]);
     });
-  }
 
-  
-
-  function exportScenariosToExcel(){
-    if (!state.scenarios || !state.scenarios.length){
-      showToast('There are no saved scenarios to export.', 'warning');
-      return;
-    }
-    if (typeof XLSX === 'undefined'){
-      showToast('Excel library not available in this browser session.', 'error');
-      return;
-    }
-    const rows = state.scenarios.map((s, idx) => ({
-      Rank: idx + 1,
-      Label: s.label,
-      Country: countryLabel(s.country),
-      Outbreak: s.outbreak === 'severe' ? 'Severe' : 'Mild',
-      Scope: scopeLabel(s.scope),
-      Coverage: (s.coverage * 100).toFixed(0) + '%',
-      Population_millions: s.popMillions,
-      Total_cost: s.totalCost,
-      Total_benefit: s.totalBenefit,
-      BCR: s.bcr,
-      Support_percent: s.support
-    }));
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, 'Scenarios');
-    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const csv = rows.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'mandeval_scenarios.xlsx';
+    a.download = 'mandeval_scenarios.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Excel file downloaded.', 'success');
+
+    showToast('Scenarios exported as CSV.', 'success');
   }
 
-  function exportSummaryPdf(){
-    if (!state.scenarios || !state.scenarios.length){
-      showToast('Save at least one scenario before exporting a PDF.', 'warning');
+  function exportSummaryPDF(){
+    if (!state.scenarios.length){
+      showToast('No scenarios to export.', 'warning');
       return;
     }
-    if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined'){
-      showToast('PDF export library not available in this browser session.', 'error');
+    if (typeof window.jspdf === 'undefined' && typeof window.jspdf === 'undefined'){
+      showToast('PDF library not loaded.', 'warning');
       return;
     }
     const { jsPDF } = window.jspdf;
+
     const doc = new jsPDF();
+    doc.setFontSize(12);
+    doc.text('MANDEVAL – Top policy options', 10, 12);
 
-    doc.setFontSize(14);
-    doc.text('Vaccine Mandate Evaluation (MANDEVAL)', 14, 18);
-    doc.setFontSize(11);
-    doc.text('Summary of saved scenarios', 14, 26);
+    let y = 20;
+    const sorted = [...state.scenarios].sort((a, b) => {
+      const aBcr = a.bcr ?? -Infinity;
+      const bBcr = b.bcr ?? -Infinity;
+      if (bBcr !== aBcr) return bBcr - aBcr;
+      const aSup = a.support ?? -Infinity;
+      const bSup = b.support ?? -Infinity;
+      return bSup - aSup;
+    }).slice(0, 10);
 
-    const sorted = [...state.scenarios].sort((a,b) => {
-      const aBCR = a.bcr ?? -Infinity;
-      const bBCR = b.bcr ?? -Infinity;
-      return bBCR - aBCR;
-    }).slice(0, 5);
-
-    let y = 38;
     sorted.forEach((s, idx) => {
       if (y > 270){
         doc.addPage();
-        y = 20;
+        y = 15;
       }
-      doc.setFont(undefined, 'bold');
-      doc.text(`${idx + 1}. ${s.label}`, 14, y);
-      doc.setFont(undefined, 'normal');
-      y += 6;
-      doc.text(`Country: ${countryLabel(s.country)}  |  Outbreak: ${s.outbreak === 'severe' ? 'Severe' : 'Mild'}`, 14, y);
-      y += 6;
-      doc.text(`Scope: ${scopeLabel(s.scope)}  |  Coverage: ${(s.coverage * 100).toFixed(0)}%`, 14, y);
-      y += 6;
-      doc.text(`Total cost: ${formatMoney(s.totalCost)}  |  Total benefit: ${formatMoney(s.totalBenefit)}`, 14, y);
-      y += 6;
-      const bcrText = s.bcr != null ? s.bcr.toFixed(2) : 'n/a';
-      doc.text(`BCR: ${bcrText}  |  Predicted support: ${formatPercent(s.support)}`, 14, y);
-      y += 8;
+      const line = `${idx + 1}. ${s.label} | ${countryLabel(s.country)}, ${outbreakLabel(s.outbreak)}, ` +
+        `${scopeLabel(s.scope)}, ${exemptionsLabel(s.exemptions)}, ${s.coverage}% coverage | ` +
+        `Cost ${formatMoney(s.totalCost)}, Benefit ${formatMoney(s.totalBenefit)}, ` +
+        `BCR ${s.bcr == null ? '–' : s.bcr.toFixed(2)}, Support ${s.support == null ? '–' : s.support.toFixed(1) + '%'}`;
+      doc.text(line, 10, y);
+      y += 7;
     });
 
-    doc.save('mandeval_summary.pdf');
-    showToast('Technical PDF exported.', 'success');
+    doc.save('mandeval_top_policy_options.pdf');
+    showToast('Summary PDF exported.', 'success');
   }
 
-  function clearStorage(){
-    try{
-      localStorage.removeItem('mandeval_state');
-      state.scenarios = [];
-      rebuildScenariosTable();
-      rebuildResultsTable();
-      showToast('Saved scenarios cleared from this browser.', 'success');
-    }catch(e){
-      showToast('Unable to clear browser storage.', 'error');
-    }
-  }
+  // AI BRIEFINGS
 
-function copyBriefing(){
-    const text = $('#briefing-text').value || '';
-    if (!text.trim()){
-      showToast('There is no briefing text to copy yet.', 'warning');
-      return;
+  function buildAIPrompt(){
+    if (!state.config || !state.costs || !state.benefits){
+      showToast('Apply configuration, costs and benefits before generating a prompt.', 'warning');
+      return '';
     }
-    if (!navigator.clipboard){
-      showToast('Clipboard access is not available in this browser.', 'error');
-      return;
-    }
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('Briefing text copied to clipboard.', 'success');
-    }).catch(() => {
-      showToast('Unable to copy briefing text.', 'error');
-    });
-  }
-
-  function buildAiPrompt(){
-    if (!state.config){
-      return 'No configuration has been applied yet. Please set a vaccine mandate scenario, including country, outbreak conditions, scope, exemptions, coverage, costs and benefits.';
-    }
-    const c = state.config;
+    const cfg = state.config;
     const costs = state.costs;
     const ben = state.benefits;
     const bcr = computeBCR();
+    const support = ben.support;
 
     const lines = [];
-    lines.push('You are assisting a government team that is designing a COVID-19 vaccine mandate in Australia, France or Italy.');
+    lines.push('You are drafting a short, neutral policy briefing on a COVID-19 vaccine mandate.');
     lines.push('');
-    lines.push('Scenario summary (from the MANDEVAL decision aid):');
-    lines.push(`- Country: ${countryLabel(c.country)}.`);
-    lines.push(`- Outbreak scenario: ${c.outbreak === 'severe' ? 'severe outbreak' : 'mild outbreak / endemic conditions'}.`);
-    lines.push(`- Mandate scope: ${scopeLabel(c.scope)}.`);
-    lines.push(`- Exemptions: ${exemptionsLabel(c.exemptions)}.`);
-    lines.push(`- Target coverage: ${(c.coverage * 100).toFixed(0)}% of about ${c.popMillions.toFixed(1)} million people.`);
-    if (costs){
-      lines.push(`- Total implementation cost (all items combined): around ${formatMoney(costs.total)} (administration ${formatMoney(costs.admin)}, communication ${formatMoney(costs.comm)}, enforcement ${formatMoney(costs.enforce)}, compensation/support ${formatMoney(costs.comp)}).`);
-    }
-    if (ben){
-      lines.push(`- Expected lives saved: about ${ben.livesTotal.toFixed(0)} in the covered population (${ben.livesPer100k.toFixed(2)} per 100,000).`);
-      lines.push(`- Monetary valuation of lives saved (if used): about ${formatMoney(ben.monetary)}.`);
-      lines.push(`- Indicative public support: ${formatPercent(ben.support)}.`);
-    }
+    lines.push('Context and setting:');
+    lines.push(`- Country: ${countryLabel(cfg.country)}`);
+    lines.push(`- Outbreak scenario: ${outbreakLabel(cfg.outbreak)}`);
+    lines.push('');
+    lines.push('Mandate design:');
+    lines.push(`- Scope: ${scopeLabel(cfg.scope)}`);
+    lines.push(`- Exemptions: ${exemptionsLabel(cfg.exemptions)}`);
+    lines.push(`- Coverage threshold: ${cfg.coverage}%`);
+    lines.push(`- Population directly exposed: ${cfg.popMillions.toFixed(1)} million people.`);
+    lines.push('');
+    lines.push('Costs (programme perspective):');
+    lines.push(`- Government administration and IT: ${formatMoney(costs.admin)}`);
+    lines.push(`- Communication and outreach: ${formatMoney(costs.comm)}`);
+    lines.push(`- Enforcement and compliance: ${formatMoney(costs.enforce)}`);
+    lines.push(`- Compensation and support: ${formatMoney(costs.comp)}`);
+    lines.push(`- Total cost: ${formatMoney(costs.total)}`);
+    lines.push('');
+    lines.push('Benefits:');
+    lines.push(`- Expected lives saved per 100,000 people: ${ben.livesPer100k.toFixed(1)}`);
+    lines.push(`- Approximate total lives saved: ${ben.livesTotal.toFixed(0)}`);
+    lines.push(`- Monetary value per life saved: ${formatMoney(ben.valuePerLife)}`);
+    lines.push(`- Total monetary benefit: ${formatMoney(ben.monetary)}`);
     if (bcr != null){
-      lines.push(`- Approximate benefit–cost ratio: ${bcr.toFixed(2)} (benefits divided by total costs).`);
-    } else {
-      lines.push('- Benefit–cost ratio: cannot be calculated yet because costs or benefits are missing.');
+      lines.push(`- Benefit–cost ratio (BCR): ${bcr.toFixed(2)}`);
+    }
+    if (support != null && !isNaN(support)){
+      lines.push(`- Model-based public support: about ${support.toFixed(1)}% (MandEval mixed logit).`);
     }
     lines.push('');
-    lines.push('Please draft a short, neutral and clear policy briefing that:');
-    lines.push('1. Summarises this mandate option in plain language;');
-    lines.push('2. Highlights the trade-offs between public health impact, costs and public support;');
-    lines.push('3. Flags any key uncertainties or assumptions that should be made explicit; and');
-    lines.push('4. Suggests up to three points for ministers or senior officials to consider when comparing this option with alternatives.');
+    lines.push('Task:');
+    lines.push(
+      'Write a concise briefing (1–2 pages) for senior decision makers that summarises ' +
+      'the rationale, expected health impact, costs, social acceptability and key ' +
+      'trade-offs of this mandate option. Use clear, non-technical language, avoid ' +
+      'jargon, and present uncertainties and limitations transparently.'
+    );
 
     return lines.join('\n');
   }
 
-  function copyPromptAndOpen(target){
-    const prompt = buildAiPrompt();
+  function copyToClipboard(text){
     if (!navigator.clipboard){
-      showToast('Clipboard access is not available in this browser.', 'error');
+      showToast('Clipboard not available in this browser.', 'warning');
       return;
     }
-    navigator.clipboard.writeText(prompt).then(() => {
-      if (target === 'copilot'){
-        window.open('https://copilot.microsoft.com/', '_blank');
-        showToast('Prompt copied. Copilot opened in a new tab.', 'success');
-      } else if (target === 'chatgpt'){
-        window.open('https://chat.openai.com/', '_blank');
-        showToast('Prompt copied. ChatGPT opened in a new tab.', 'success');
-      } else {
-        showToast('Prompt copied to clipboard.', 'success');
-      }
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Text copied to clipboard.', 'success');
     }).catch(() => {
-      showToast('Unable to copy AI prompt.', 'error');
+      showToast('Unable to copy to clipboard.', 'error');
     });
   }
 
-  function init(){
-    initTabs();
+  // INIT
 
-    const btnApplyConfig = $('#btn-apply-config');
-    const btnViewSummary = $('#btn-view-summary');
-    const btnSaveScenario = $('#btn-save-scenario');
-    const btnApplyCosts = $('#btn-apply-costs');
-    const btnApplyBenefits = $('#btn-apply-benefits');
-    const btnCopyBriefing = $('#btn-copy-briefing');
-    const btnCopilot = $('#btn-open-copilot');
-    const btnChatGPT = $('#btn-open-chatgpt');
-    const btnExportExcel = $('#btnExportExcel');
-    const btnExportPdf = $('#btnExportPdf');
-    const btnClearStorage = $('#btnClearStorage');
-
-    if (btnApplyConfig) btnApplyConfig.addEventListener('click', applyConfig);
-    if (btnViewSummary) btnViewSummary.addEventListener('click', viewSummary);
-    if (btnSaveScenario) btnSaveScenario.addEventListener('click', saveScenario);
-    if (btnApplyCosts) btnApplyCosts.addEventListener('click', applyCosts);
-    if (btnApplyBenefits) btnApplyBenefits.addEventListener('click', applyBenefits);
-    if (btnCopyBriefing) btnCopyBriefing.addEventListener('click', copyBriefing);
-    if (btnCopilot) btnCopilot.addEventListener('click', () => copyPromptAndOpen('copilot'));
-    if (btnChatGPT) btnChatGPT.addEventListener('click', () => copyPromptAndOpen('chatgpt'));
-    if (btnExportExcel) btnExportExcel.addEventListener('click', exportScenariosToExcel);
-    if (btnExportPdf) btnExportPdf.addEventListener('click', exportSummaryPdf);
-    if (btnClearStorage) btnClearStorage.addEventListener('click', clearStorage);
-
-    switchTab('introTab');
+  function initTabs(){
+    $$('.tab-link').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabId = btn.dataset.tab;
+        if (tabId) switchTab(tabId);
+      });
+    });
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+  function initButtons(){
+    const applyConfigBtn = $('#btn-apply-config');
+    if (applyConfigBtn){
+      applyConfigBtn.addEventListener('click', applyConfig);
+    }
+    const viewSummaryBtn = $('#btn-view-summary');
+    if (viewSummaryBtn){
+      viewSummaryBtn.addEventListener('click', () => {
+        if (!state.config){
+          showToast('Apply a configuration first.', 'warning');
+          return;
+        }
+        switchTab('resultsTab');
+      });
+    }
+
+    const applyCostsBtn = $('#btn-apply-costs');
+    if (applyCostsBtn){
+      applyCostsBtn.addEventListener('click', applyCosts);
+    }
+
+    const applyBenefitsBtn = $('#btn-apply-benefits');
+    if (applyBenefitsBtn){
+      applyBenefitsBtn.addEventListener('click', applyBenefits);
+    }
+
+    const saveScenarioBtn = $('#btn-save-scenario');
+    if (saveScenarioBtn){
+      saveScenarioBtn.addEventListener('click', saveScenario);
+    }
+
+    const clearScenariosBtn = $('#btn-clear-scenarios');
+    if (clearScenariosBtn){
+      clearScenariosBtn.addEventListener('click', () => {
+        state.scenarios = [];
+        rebuildScenariosTable();
+        rebuildResultsTable(state.scenarios);
+        showToast('All scenarios cleared.', 'success');
+      });
+    }
+
+    const exportCsvBtn = $('#btn-export-csv');
+    if (exportCsvBtn){
+      exportCsvBtn.addEventListener('click', exportScenariosCSV);
+    }
+
+    const exportPdfBtn = $('#btn-export-pdf');
+    if (exportPdfBtn){
+      exportPdfBtn.addEventListener('click', exportSummaryPDF);
+    }
+
+    const genCopilotBtn = $('#btn-generate-copilot');
+    if (genCopilotBtn){
+      genCopilotBtn.addEventListener('click', () => {
+        const prompt = buildAIPrompt();
+        if (!prompt) return;
+        const box = $('#ai-briefing-text');
+        box.value = prompt;
+        copyToClipboard(prompt);
+        window.open('https://copilot.microsoft.com/', '_blank');
+        showToast('Copilot prompt generated and copied.', 'success');
+      });
+    }
+
+    const genChatgptBtn = $('#btn-generate-chatgpt');
+    if (genChatgptBtn){
+      genChatgptBtn.addEventListener('click', () => {
+        const prompt = buildAIPrompt();
+        if (!prompt) return;
+        const box = $('#ai-briefing-text');
+        box.value = prompt;
+        copyToClipboard(prompt);
+        showToast('ChatGPT prompt generated and copied.', 'success');
+      });
+    }
+
+    const copyBriefingBtn = $('#btn-copy-briefing');
+    if (copyBriefingBtn){
+      copyBriefingBtn.addEventListener('click', () => {
+        const text = $('#ai-briefing-text').value || '';
+        if (!text.trim()){
+          showToast('No prompt to copy yet.', 'warning');
+          return;
+        }
+        copyToClipboard(text);
+      });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initTabs();
+    initButtons();
+  });
+
 })();
