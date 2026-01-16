@@ -1,20 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>MANDEVAL Technical Appendix</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <title>MANDEVAL – Technical appendix</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
-      --bg-body: #f4f6f9;
+      --bg-page: #f5f7fa;
       --bg-card: #ffffff;
+      --border-subtle: #d2d6dc;
       --text-main: #111827;
-      --text-muted: #4b5563;
-      --accent: #0b5c9f;
-      --accent-soft: #e5f2fb;
-      --border-soft: #d1d5db;
-      --font-main: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-        "Helvetica Neue", Arial, sans-serif;
+      --text-muted: #6b7280;
+      --primary: #1f6feb;
     }
 
     * {
@@ -23,457 +20,492 @@
 
     body {
       margin: 0;
-      padding: 1rem;
-      font-family: var(--font-main);
-      background: var(--bg-body);
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: var(--text-main);
+      background: var(--bg-page);
     }
 
     .page {
-      max-width: 960px;
-      margin: 0 auto;
-      background: var(--bg-card);
-      border-radius: 10px;
-      padding: 1.25rem 1.5rem;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 0 14px 20px 14px;
     }
 
-    h1, h2, h3 {
-      margin-top: 0;
-      color: var(--accent);
+    header {
+      padding: 10px 0 2px 0;
+      border-bottom: 3px solid var(--primary);
+      margin-bottom: 12px;
     }
 
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
+    header h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+
+    header p {
+      margin: 2px 0 0 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
     }
 
     h2 {
-      font-size: 1.2rem;
-      margin-top: 1.25rem;
-      border-bottom: 1px solid var(--border-soft);
-      padding-bottom: 0.25rem;
+      margin-top: 16px;
+      margin-bottom: 6px;
+      font-size: 1.1rem;
     }
 
     h3 {
-      font-size: 1rem;
-      margin-top: 0.9rem;
+      margin-top: 12px;
+      margin-bottom: 4px;
+      font-size: 0.98rem;
     }
 
     p {
+      margin: 4px 0;
       font-size: 0.9rem;
-      color: var(--text-main);
     }
 
-    .muted {
-      color: var(--text-muted);
+    ul {
+      margin: 4px 0 6px 18px;
+      font-size: 0.9rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 10px;
     }
 
     .pill {
       display: inline-block;
-      padding: 0.15rem 0.55rem;
+      padding: 2px 8px;
       border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-size: 0.75rem;
-      margin-right: 0.4rem;
+      background: #e5f0ff;
+      color: #0b3d91;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
-    .two-col {
+    .grid-2 {
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
     }
 
-    @media (max-width: 800px) {
-      .two-col {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
-    ul {
-      padding-left: 1.1rem;
+    .highlight {
+      background: #ecf5ff;
+      border-left: 3px solid #1557bf;
+      padding: 6px 8px;
       font-size: 0.9rem;
-    }
-
-    li {
-      margin-bottom: 0.3rem;
-    }
-
-    code {
-      font-size: 0.8rem;
-      background: #f3f4f6;
-      padding: 0.05rem 0.25rem;
       border-radius: 4px;
-    }
-
-    .box {
-      border-radius: 8px;
-      border: 1px solid var(--border-soft);
-      padding: 0.65rem 0.75rem;
-      margin: 0.6rem 0;
-      background: #f9fafb;
-      font-size: 0.85rem;
-    }
-
-    .box strong {
-      color: var(--accent);
-    }
-
-    .example {
-      border-left: 3px solid var(--accent);
-      padding-left: 0.7rem;
-      margin: 0.5rem 0;
-      background: #f9fafb;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 0.5rem 0;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
+      margin-top: 4px;
     }
 
-    th, td {
-      padding: 0.35rem 0.4rem;
-      border-bottom: 1px solid #e5e7eb;
+    table th,
+    table td {
+      border: 1px solid #e5e7eb;
+      padding: 3px 4px;
       text-align: left;
     }
 
-    th {
+    table thead {
       background: #f3f4f6;
+    }
+
+    .small {
+      font-size: 0.8rem;
+      color: var(--text-muted);
     }
 
     .tag {
       display: inline-block;
-      padding: 0.1rem 0.45rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      background: #eef2ff;
-      color: #4338ca;
-      margin-right: 0.25rem;
-      margin-bottom: 0.2rem;
+      font-size: 0.72rem;
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: #e5e7eb;
+      margin-right: 4px;
+      margin-bottom: 2px;
     }
 
-    .section-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin-bottom: 0.25rem;
+    .changelog {
+      font-size: 0.82rem;
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+      }
+      .card {
+        box-shadow: none;
+      }
     }
   </style>
 </head>
 <body>
   <div class="page">
-    <h1>MANDEVAL Technical Appendix</h1>
-    <p class="muted">
-      This appendix explains how the MANDEVAL decision aid works, in two layers:
-      a non-technical layer for policy users and a more technical layer for analysts.
-    </p>
+    <header>
+      <h1>MANDEVAL – Technical appendix</h1>
+      <p>Methods, parameters and guidance for the vaccine mandate decision aid (Australia, France, Italy).</p>
+      <p class="small">Version v1.0.0 &nbsp;|&nbsp; Built Jan 2026</p>
+    </header>
 
-    <div class="two-col">
-      <div>
-        <h2>1. Overview (non-technical)</h2>
-        <p>
-          MANDEVAL is a decision aid that links three main ingredients:
-        </p>
-        <ul>
-          <li><strong>Public preferences</strong> from a discrete choice experiment (DCE) on vaccine mandates.</li>
-          <li><strong>Epidemiological benefit</strong> expressed as “expected lives saved per 100,000 people”.</li>
-          <li><strong>Indicative economic value</strong> combining the value of lives saved with implementation costs.</li>
-        </ul>
-        <p>
-          For each configuration (country, outbreak scenario and mandate design), the tool:
-        </p>
-        <ul>
-          <li>Predicts the <strong>probability of public support</strong> for that mandate,</li>
-          <li>Converts the “lives saved per 100,000” input into total lives saved and a monetary value, and</li>
-          <li>Compares this value with <strong>implementation costs</strong> entered by the user.</li>
-        </ul>
+    <section class="card">
+      <span class="pill">Overview</span>
+      <h2>1. Purpose and scope</h2>
+      <p>
+        This appendix documents the main inputs, modelling assumptions and outputs used in MANDEVAL, a decision aid for
+        exploring the consequences of different COVID-19 vaccine mandate designs in Australia, France and Italy.
+      </p>
+      <p>
+        MANDEVAL combines preference estimates from a discrete choice experiment (DCE) with simple epidemiological and
+        costing inputs to provide:
+      </p>
+      <ul>
+        <li>Model-based predicted public support for a given mandate configuration.</li>
+        <li>Expected lives saved in the exposed population, based on a “lives saved per 100,000” input.</li>
+        <li>Monetary valuation of lives saved, using a value per life saved (for example a value of statistical life).</li>
+        <li>Implementation costs and resulting net benefit and benefit–cost ratios.</li>
+        <li>“Lives-saved equivalents” (MRS) to interpret preferences over mandate design features.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <span class="pill">Non-technical</span>
+      <h2>2. How the tabs fit together</h2>
+      <div class="grid-2">
+        <div>
+          <h3>2.1. Settings</h3>
+          <p>
+            The Settings tab defines the population, analysis horizon and value per life saved. These apply to all
+            scenarios:
+          </p>
+          <ul>
+            <li><strong>Analysis horizon:</strong> number of years during which costs and benefits are considered.</li>
+            <li><strong>Population covered:</strong> number of people exposed to the mandate.</li>
+            <li>
+              <strong>Value per life saved:</strong> a monetary value attached to one life saved, aligned with national
+              regulatory guidance where possible.
+            </li>
+          </ul>
+
+          <h3>2.2. Mandate configuration</h3>
+          <p>
+            The Configuration tab selects the country, outbreak scenario and design features of the mandate (scope,
+            exemptions, coverage threshold, expected lives saved). The preference model then calculates the predicted
+            probability that people would support this mandate over no mandate.
+          </p>
+        </div>
+        <div>
+          <h3>2.3. Costing</h3>
+          <p>
+            The Costing tab allows users to enter indicative implementation costs across several categories (digital
+            systems, communications, enforcement, compensation, administration and other costs). These are summed into a
+            total implementation cost.
+          </p>
+          <h3>2.4. Results</h3>
+          <p>
+            The Results tab combines preference-based support, epidemiological inputs and costs to produce:
+          </p>
+          <ul>
+            <li>Total lives saved in the exposed population.</li>
+            <li>Monetary value of lives saved.</li>
+            <li>Total implementation cost, net benefit and benefit–cost ratio.</li>
+            <li>
+              Lives-saved equivalents (MRS) that interpret changes in mandate features in terms of “equivalent lives saved
+              per 100,000 people”.
+            </li>
+          </ul>
+          <p>
+            Status chips indicate whether predicted support and the benefit–cost ratio appear high, medium or low, based
+            on transparent thresholds.
+          </p>
+        </div>
       </div>
-
-      <div>
-        <h2>2. Main tabs and what they do</h2>
-        <ul>
-          <li>
-            <span class="pill">Introduction</span>
-            Explains the purpose of the tool, who it is for, and how to use it in five simple steps.
-          </li>
-          <li>
-            <span class="pill">Mandate design features</span>
-            Lists the DCE attributes (scope, exemptions, coverage, lives saved) and their levels in plain language.
-          </li>
-          <li>
-            <span class="pill">Settings &amp; assumptions</span>
-            Sets the analysis horizon, population, currency and value-per-life metric (e.g. VSL).
-          </li>
-          <li>
-            <span class="pill">Configuration</span>
-            Lets users choose a country, outbreak scenario and mandate design. This drives the model-based support calculation.
-          </li>
-          <li>
-            <span class="pill">Costing &amp; implementation</span>
-            Collects indicative costs across key components (digital passes, communications, enforcement, etc.).
-          </li>
-          <li>
-            <span class="pill">Results</span>
-            Shows lives saved, monetary benefits, costs, BCR, predicted public support and “lives-saved equivalents” (MRS).
-          </li>
-          <li>
-            <span class="pill">Saved scenarios &amp; exports</span>
-            Stores scenarios in the browser, compares them and exports data for reports.
-          </li>
-          <li>
-            <span class="pill">Briefings &amp; AI</span>
-            Pre-populates a briefing template and an AI-ready prompt for tools like Copilot or ChatGPT.
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <h2>3. How each tab works (non-technical view)</h2>
-
-    <h3>3.1 Mandate design features</h3>
-    <p>
-      The <strong>Mandate design features</strong> tab summarises the attributes and levels used in the DCE. Each attribute
-      can be thought of as a “dial” that can be turned to design a mandate. The four core dials are:
-    </p>
-    <ul>
-      <li><strong>Scope of mandate</strong>: who is covered (only high-risk workers vs. everyone in public spaces).</li>
-      <li><strong>Exemptions</strong>: how narrow or broad exemptions are (medical only vs. medical + religious + personal belief).</li>
-      <li><strong>Coverage requirement</strong>: vaccination threshold required to lift the mandate (50%, 70% or 90%).</li>
-      <li><strong>Estimated lives saved</strong>: expected lives saved per 100,000 if the mandate is introduced.</li>
-    </ul>
-    <p>
-      In the DCE, people saw different combinations of these features and chose between two mandates and an opt-out option.
-      This reveals how strongly people care about each feature.
-    </p>
-
-    <h3>3.2 Settings &amp; assumptions</h3>
-    <p>
-      The <strong>Settings &amp; assumptions</strong> tab fixes the “background numbers” that are reused across scenarios:
-    </p>
-    <ul>
-      <li><strong>Analysis horizon</strong>: the time period over which costs and benefits are considered (e.g. 1 year).</li>
-      <li><strong>Population exposed</strong>: the number of people covered by the mandate (e.g. 1 million high-risk workers).</li>
-      <li><strong>Currency label</strong>: how monetary values are labelled (e.g. A$, €, local currency units).</li>
-      <li><strong>Value per life saved</strong>: a VSL-type number that converts lives saved into monetary terms.</li>
-    </ul>
-    <p>
-      Changing these settings will update all downstream calculations. The tool does not enforce any particular value – it
-      makes assumptions explicit, so they can be discussed and, if needed, revised.
-    </p>
-
-    <h3>3.3 Configuration</h3>
-    <p>
-      The <strong>Configuration</strong> tab is where a specific mandate is defined:
-    </p>
-    <ul>
-      <li>Choose <strong>country</strong> (Australia, France or Italy).</li>
-      <li>Choose <strong>outbreak scenario</strong> (mild/endemic vs. severe outbreak).</li>
-      <li>Set the <strong>scope, exemptions and coverage threshold</strong> according to the DCE levels.</li>
-      <li>Set the <strong>expected lives saved per 100,000</strong> using the slider.</li>
-    </ul>
-    <p>
-      When you click <strong>“Apply configuration”</strong>, the tool:
-    </p>
-    <ul>
-      <li>Uses the mixed logit estimates for the chosen country and outbreak frame.</li>
-      <li>Simulates many “draws” of preferences to reflect heterogeneity in the population.</li>
-      <li>Calculates the predicted probability that the mandate is supported, versus opting out.</li>
-    </ul>
-    <p>
-      When you click <strong>“Save scenario”</strong>, the configuration and results are stored in your browser and appear in
-      the <em>Saved scenarios &amp; exports</em> tab.
-    </p>
-
-    <h3>3.4 Costing &amp; implementation</h3>
-    <p>
-      The <strong>Costing &amp; implementation</strong> tab aggregates user-entered costs across key components. These are
-      indicative and should be refined with local data. This feeds into the net benefit and BCR calculations.
-    </p>
-
-    <h3>3.5 Results (including MRS)</h3>
-    <p>
-      The <strong>Results</strong> tab brings together three pillars:
-    </p>
-    <ul>
-      <li><strong>Lives and monetary benefits</strong>: total lives saved and their monetary valuation.</li>
-      <li><strong>Costs and BCR</strong>: total implementation cost, net benefit and benefit–cost ratio.</li>
-      <li><strong>Predicted public support</strong>: probability that the mandate is chosen over opt-out in the DCE.</li>
-    </ul>
-    <p>
-      The <strong>“lives-saved equivalent”</strong> section then interprets how strongly people care about mandate design
-      features in terms of lives saved. It asks: “how many expected lives saved per 100,000 would compensate for changing this
-      attribute?”
-    </p>
-
-    <div class="box">
-      <strong>Example intuition:</strong>
-      If making exemptions stricter (e.g. removing personal-belief exemptions) reduces utility, this might show up as a
-      positive lives-saved equivalent value: “this change feels as costly as losing 2 lives saved per 100,000 people”.
-    </div>
-
-    <h3>3.6 Saved scenarios &amp; exports; Briefings &amp; AI</h3>
-    <p>
-      The <strong>Saved scenarios</strong> tab keeps a local “portfolio” of options. The export functions allow users to
-      generate:
-    </p>
-    <ul>
-      <li>CSV/Excel-readable files for more detailed analysis,</li>
-      <li>Plain-text summaries for briefing documents, and</li>
-      <li>AI-ready prompts that can be used to draft tailored communications.</li>
-    </ul>
-
-    <h2>4. Technical details (for analysts)</h2>
-
-    <h3>4.1 Mixed logit model and predicted support</h3>
-    <p>
-      The underlying preference models are <strong>mixed logit models</strong> estimated separately for each country
-      (Australia, France, Italy) and outbreak frame (mild vs. severe). For each of these six combinations, the model
-      estimates:
-    </p>
-    <ul>
-      <li>Mean coefficients for:
-        <span class="tag">ASC – Policy A</span>
-        <span class="tag">ASC – Opt-out</span>
-        <span class="tag">Scope (all vs. high-risk)</span>
-        <span class="tag">Exemptions (med+rel, med+rel+pers)</span>
-        <span class="tag">Coverage thresholds (70%, 90%)</span>
-        <span class="tag">Lives saved per 100,000</span>
-      </li>
-      <li>Standard deviations for each of these random coefficients.</li>
-    </ul>
-    <p>
-      In the tool, these are used as follows:
-    </p>
-    <ul>
-      <li>
-        For a given country and outbreak scenario, the mean and standard deviation for each coefficient are loaded.
-      </li>
-      <li>
-        For each configuration, the tool draws <strong>1,000 simulated preference vectors</strong> by sampling from a normal
-        distribution around each mean with the estimated standard deviation (independent draws for each coefficient).
-      </li>
-      <li>
-        For each draw, it forms a utility for the mandate alternative and a utility for the opt-out alternative:
-      </li>
-    </ul>
-    <div class="example">
       <p>
-        <strong>Mandate utility (per draw)</strong>:
+        The Saved scenarios tab stores complete scenarios (settings, configuration, costs and results) for comparison and
+        export, while the Briefings &amp; AI prompts tab helps users translate scenarios into short policy briefings or
+        prompts for Copilot / ChatGPT.
+      </p>
+    </section>
+
+    <section class="card">
+      <span class="pill">Interpretation</span>
+      <h2>3. Predicted public support</h2>
+      <p>
+        MANDEVAL reports “predicted public support” as the model-based probability that a respondent would choose a given
+        mandate over an opt-out (no mandate) option, conditional on the country and outbreak frame.
+      </p>
+      <p>
+        The underlying utility functions are:
       </p>
       <ul>
-        <li>Start from the policy-alternative intercept.</li>
-        <li>Add the coefficient for the chosen scope (if population-wide).</li>
-        <li>Add the coefficient for the chosen exemption policy.</li>
-        <li>Add the coefficient for the chosen coverage threshold (70% or 90%; 50% is the reference).</li>
-        <li>Add the lives-saved coefficient multiplied by the configured “lives saved per 100,000”.</li>
+        <li><strong>U(mandate):</strong> utility from a mandate with specific scope, exemptions, coverage and lives saved.</li>
+        <li><strong>U(opt-out):</strong> utility from the “no mandate” option.</li>
       </ul>
+      <p class="highlight">
+        For a given vector of random preferences β, the model­based probability of choosing the mandate is:
+        <br />
+        <em>P(mandate | β) = exp(U(mandate; β)) / [exp(U(mandate; β)) + exp(U(opt-out; β))]</em>.
+      </p>
       <p>
-        <strong>Opt-out utility (per draw)</strong>:
+        In MANDEVAL, preferences β are assumed to follow a multivariate normal distribution, estimated separately for each
+        country and outbreak frame. The predicted probability used in the tool is the average of P(mandate | β) over
+        1,000 draws from this distribution, using a fixed random seed for reproducibility.
+      </p>
+      <p class="small">
+        Interpretation: a predicted support of 65% means that, under the stated conditions and extrapolating from the
+        DCE, around two thirds of respondents would choose the mandate over no mandate. It is not a forecast of
+        compliance or turnout and should be interpreted as an indicative acceptability measure.
+      </p>
+    </section>
+
+    <section class="card">
+      <span class="pill">Methods</span>
+      <h2>4. Discrete choice experiment and mixed logit models</h2>
+      <h3>4.1. Attributes and levels</h3>
+      <p>
+        The DCE asked respondents to choose between two mandate options and an opt-out alternative. Mandates were
+        described using:
       </p>
       <ul>
-        <li>Use only the opt-out intercept from that draw.</li>
+        <li>Scope (high-risk occupations only vs all occupations &amp; public spaces).</li>
+        <li>Exemption policy (medical only; medical + religious; medical + religious + personal belief).</li>
+        <li>Coverage threshold to lift the mandate (50%, 70% or 90% of the population vaccinated).</li>
+        <li>Expected lives saved per 100,000 people (10, 25, 35 or 40).</li>
       </ul>
-    </div>
-    <p>
-      For each draw, the probability of supporting the mandate is computed using a two-alternative logit formula:
-    </p>
-    <ul>
-      <li>The support probability is then averaged across all 1,000 draws to obtain a model-based estimate of public support.</li>
-    </ul>
 
-    <h3>4.2 Lives saved and monetary benefits</h3>
-    <p>
-      The epidemiological benefit parameter in the DCE is the expected number of lives saved per 100,000 people. In the tool:
-    </p>
-    <ul>
-      <li>The user sets <code>L</code> = expected lives saved per 100,000.</li>
-      <li>The exposed population is <code>P</code>.</li>
-      <li>Expected lives saved in the covered population are <code>L × P / 100,000</code>.</li>
-      <li>Monetary benefits are <code>(L × P / 100,000) × V</code>, where <code>V</code> is the value per life saved.</li>
-    </ul>
-    <p>
-      The value per life can be interpreted as a VSL, a value per life-year (VSLY) multiplied by expected years of life saved,
-      or another locally agreed metric.
-    </p>
-
-    <h3>4.3 Costs, net benefit and BCR</h3>
-    <p>
-      Costs are entered as level sums across components such as digital systems, communications, enforcement and compensation
-      schemes. These are treated as one-off (undiscounted) costs over the chosen horizon:
-    </p>
-    <ul>
-      <li><strong>Total cost</strong> is the sum of all components.</li>
-      <li><strong>Net benefit</strong> is monetary benefit minus total cost.</li>
-      <li><strong>BCR</strong> is monetary benefit divided by total cost (if total cost &gt; 0).</li>
-    </ul>
-
-    <h3>4.4 Lives-saved equivalents (MRS)</h3>
-    <p>
-      The lives-saved equivalent calculations translate preference strength for non-lives attributes into the same units as
-      the lives-saved attribute. For each attribute change (e.g. moving from high-risk scope to population-wide scope), the
-      tool uses the ratio of the attribute coefficient to the lives-saved coefficient to obtain a number of lives per
-      100,000 people that would have the same effect on utility.
-    </p>
-    <p>
-      Interpretation:
-    </p>
-    <ul>
-      <li>
-        A <strong>positive</strong> lives-saved equivalent means the change reduces acceptability: it would require extra
-        lives saved to offset this loss in utility.
-      </li>
-      <li>
-        A <strong>negative</strong> lives-saved equivalent means the change increases acceptability: it is as attractive as
-        gaining additional lives saved.
-      </li>
-    </ul>
-
-    <h2>5. Worked example (non-technical)</h2>
-
-    <div class="example">
+      <h3>4.2. Mixed logit specification</h3>
       <p>
-        Suppose we configure the following mandate:
+        For each country (Australia, France, Italy) and outbreak frame (mild / endemic, severe), a mixed logit (random
+        parameters logit) model was estimated with normally distributed random coefficients:
       </p>
       <ul>
-        <li>Country: Italy; outbreak: severe.</li>
-        <li>Scope: all occupations &amp; public spaces.</li>
-        <li>Exemptions: medical + religious.</li>
-        <li>Coverage threshold: 70% of the population.</li>
-        <li>Expected lives saved: 25 per 100,000.</li>
-        <li>Population covered: 1,000,000 people.</li>
-        <li>Value per life saved: 3,000,000 in local currency units.</li>
+        <li>ASC for Policy A (mandate alternative).</li>
+        <li>ASC for opt-out (no mandate).</li>
+        <li>Dummy variables for scope, exemptions and coverage threshold levels.</li>
+        <li>A continuous coefficient for expected lives saved per 100,000 people.</li>
       </ul>
+
       <p>
-        The tool will:
+        The tool uses the estimated means and standard deviations of these random coefficients to generate 1,000 draws
+        from a multivariate normal distribution (using independent normals for each parameter). For each draw, utilities
+        for the mandate and opt-out options are computed at the chosen configuration, and the logit probability of
+        supporting the mandate is calculated. The mean of these probabilities across draws is reported as “predicted
+        public support”.
+      </p>
+
+      <h3>4.3. Coefficient tables used in the tool</h3>
+      <p>
+        The table below illustrates the structure of the mean coefficients used in MANDEVAL (values correspond to the
+        mixed logit estimates imported into the tool).
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Country / frame</th>
+            <th>ASC Policy A</th>
+            <th>ASC Opt-out</th>
+            <th>Scope all</th>
+            <th>Exemptions med+rel</th>
+            <th>Exemptions med+rel+personal</th>
+            <th>Coverage 70%</th>
+            <th>Coverage 90%</th>
+            <th>Lives saved (per 100k)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Australia, mild</td>
+            <td>0.464</td>
+            <td>−0.572</td>
+            <td>−0.319</td>
+            <td>−0.157</td>
+            <td>−0.267</td>
+            <td>0.171</td>
+            <td>0.158</td>
+            <td>0.072</td>
+          </tr>
+          <tr>
+            <td>Australia, severe</td>
+            <td>0.535</td>
+            <td>−0.694</td>
+            <td>0.190</td>
+            <td>−0.181</td>
+            <td>−0.305</td>
+            <td>0.371</td>
+            <td>0.398</td>
+            <td>0.079</td>
+          </tr>
+          <tr>
+            <td>Italy, mild</td>
+            <td>0.625</td>
+            <td>−0.238</td>
+            <td>−0.276</td>
+            <td>−0.176</td>
+            <td>−0.289</td>
+            <td>0.185</td>
+            <td>0.148</td>
+            <td>0.039</td>
+          </tr>
+          <tr>
+            <td>Italy, severe</td>
+            <td>0.799</td>
+            <td>−0.463</td>
+            <td>0.174</td>
+            <td>−0.178</td>
+            <td>−0.207</td>
+            <td>0.305</td>
+            <td>0.515</td>
+            <td>0.045</td>
+          </tr>
+          <tr>
+            <td>France, mild</td>
+            <td>0.899</td>
+            <td>0.307</td>
+            <td>−0.160</td>
+            <td>−0.121</td>
+            <td>−0.124</td>
+            <td>0.232</td>
+            <td>0.264</td>
+            <td>0.049</td>
+          </tr>
+          <tr>
+            <td>France, severe</td>
+            <td>0.884</td>
+            <td>0.083</td>
+            <td>−0.019</td>
+            <td>−0.192</td>
+            <td>−0.247</td>
+            <td>0.267</td>
+            <td>0.398</td>
+            <td>0.052</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="small">
+        The standard deviations of these coefficients are also used to generate random draws, and follow the mixed logit
+        estimates provided in the main analysis.
+      </p>
+    </section>
+
+    <section class="card">
+      <span class="pill">Costs &amp; benefits</span>
+      <h2>5. Cost taxonomy and value per life saved</h2>
+      <h3>5.1. Cost categories</h3>
+      <p>
+        The costing framework in MANDEVAL is designed to mirror standard components used in regulatory impact analyses
+        for vaccine mandates and similar public health measures. It includes:
       </p>
       <ul>
-        <li>Simulate 1,000 preference draws from the Italian severe mixed logit model.</li>
-        <li>For each draw, compute the probability of supporting this mandate versus opting out.</li>
-        <li>Average these probabilities to report model-based public support (e.g. “about 65%”).</li>
+        <li>Digital systems &amp; infrastructure (IT platforms, certificates, registries, integration).</li>
+        <li>Communications &amp; public information (campaigns, materials, stakeholder engagement).</li>
+        <li>Enforcement &amp; compliance (inspection, enforcement staff, penalties administration).</li>
+        <li>Adverse-event monitoring &amp; compensation (pharmacovigilance and compensation schemes).</li>
+        <li>Administration &amp; programme management (design, legal, coordination, oversight).</li>
+        <li>Other mandate-specific costs (residual category for context-specific items).</li>
+      </ul>
+      <p>
+        Users can adapt these values based on country-specific data, financial reports or regulatory impact assessments.
+      </p>
+
+      <h3>5.2. Value per life saved</h3>
+      <p>
+        The tool applies a single value per life saved to monetise the estimated lives saved. In practice, this is often
+        anchored in:
+      </p>
+      <ul>
+        <li>A value of statistical life (VSL) used in national regulatory guidance.</li>
+        <li>A value of a statistical life-year (VSLY), where appropriate for age-structured analyses.</li>
         <li>
-          Compute total lives saved: <code>25 × 1,000,000 / 100,000 = 250</code> lives saved.
-        </li>
-        <li>
-          Compute monetary benefit: <code>250 × 3,000,000 = 750,000,000</code> in local currency units.
-        </li>
-        <li>
-          Combine this with entered costs to compute net benefit and BCR.
-        </li>
-        <li>
-          Translate the impact of changing scope, exemptions or coverage into lives-saved equivalents using the model
-          coefficients.
+          Programme-specific willingness-to-pay thresholds (for example cost-effectiveness thresholds used in health
+          technology assessment).
         </li>
       </ul>
-    </div>
+      <p class="highlight">
+        Users should align the value per life saved with relevant national or institutional guidance, and document the
+        chosen value and source when using MANDEVAL in formal policy analysis.
+      </p>
+    </section>
 
-    <p class="muted">
-      All numbers produced by MANDEVAL are indicative and depend on the chosen assumptions. For formal regulatory impact
-      analysis, the underlying data, code and parameters should be reviewed, and local costing data should be integrated.
-    </p>
+    <section class="card">
+      <span class="pill">Worked examples</span>
+      <h2>6. Worked examples (illustrative)</h2>
+      <p>
+        This section illustrates how to follow a configuration through the tool. The numbers below are examples and should
+        be replaced by country-specific inputs when used in practice.
+      </p>
+
+      <h3>6.1. Italy, severe outbreak</h3>
+      <ul>
+        <li><strong>Settings:</strong> population = 5,000,000; value per life saved = EUR 5,000,000; horizon = 1 year.</li>
+        <li>
+          <strong>Configuration:</strong> scope = all occupations &amp; public spaces; exemptions = medical + religious;
+          coverage threshold = 70%; expected lives saved = 25 per 100,000 people.
+        </li>
+        <li>
+          <strong>Costing:</strong> digital systems = EUR 8m; communications = EUR 3m; enforcement = EUR 10m;
+          compensation = EUR 4m; administration = EUR 2m; other = EUR 3m (illustrative figures).
+        </li>
+      </ul>
+      <p>
+        The tool translates this into a total lives saved figure, monetary benefit of lives saved, total implementation
+        cost, net benefit, benefit–cost ratio and predicted support. Status chips and charts highlight whether support and
+        BCR appear high, medium or low, given the assumptions.
+      </p>
+
+      <h3>6.2. Australia, mild</h3>
+      <p>
+        An analogous example can be constructed for Australia under the mild frame, using a population (for example
+        25,000,000), locally appropriate cost inputs and a value per life saved consistent with Australian regulatory
+        guidance.
+      </p>
+
+      <h3>6.3. France, mild</h3>
+      <p>
+        A further example can be built for France in the mild frame, illustrating differences in predicted support across
+        the three countries for similar policy designs.
+      </p>
+    </section>
+
+    <section class="card">
+      <span class="pill">Governance</span>
+      <h2>7. Versioning and quality control</h2>
+      <p>
+        MANDEVAL has been structured to make updates transparent and auditable. The footer in the main application shows
+        the version number and build date. This appendix includes a short changelog.
+      </p>
+
+      <h3>7.1. Internal quality checks</h3>
+      <p>
+        Before publication, a small grid of test scenarios is defined and evaluated using both MANDEVAL and the original
+        estimation environment (for example MATLAB or R). Predicted support, lives saved, benefit–cost metrics and
+        lives-saved equivalents are cross-checked to ensure the web implementation reproduces the reference calculations
+        up to expected rounding differences.
+      </p>
+
+      <h3>7.2. Changelog</h3>
+      <ul class="changelog">
+        <li>
+          <span class="tag">v1.0.0</span>
+          First stable release of MANDEVAL. Integrated mixed logit preference estimates with a fixed set of 1,000 normal
+          draws. Implemented settings, configuration, costing, results, scenario storage and briefing exports. Added
+          lives-saved-equivalent (MRS) interpretations, status chips and an AI-assisted briefing prompt.
+        </li>
+      </ul>
+    </section>
   </div>
 </body>
 </html>
