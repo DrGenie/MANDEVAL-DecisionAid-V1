@@ -1,5 +1,25 @@
+'use strict';
+
 /* =========================================================
-   MANDEVAL – core state
+   Global seed for reproducible mixed-logit draws
+   ========================================================= */
+
+const RANDOM_SEED = 123456789; // change only when you want a new fixed panel of draws
+
+function mulberry32(a) {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// seeded PRNG instance
+let prng = mulberry32(RANDOM_SEED);
+
+/* =========================================================
+   Core state
    ========================================================= */
 
 const state = {
@@ -17,8 +37,9 @@ const state = {
 };
 
 /* =========================================================
-   Mixed logit coefficient means (by country & outbreak)
+   Mixed logit coefficient means and SDs
    (ASC Policy A, ASC Opt-out, scope, exemptions, coverage, lives)
+   Coverage coefficients as estimated in the study.
    ========================================================= */
 
 const mxlCoefs = {
@@ -90,159 +111,199 @@ const mxlCoefs = {
   }
 };
 
-  const mxlSDs = {
-    AU: {
-      mild: {
-        ascPolicyA: 1.104,
-        ascOptOut: 5.340,
-        scopeAll: 1.731,
-        exMedRel: 0.443,
-        exMedRelPers: 1.254,
-        cov70: 0.698,
-        cov90: 1.689,
-        lives: 0.101
-      },
-      severe: {
-        ascPolicyA: 1.019,
-        ascOptOut: 5.021,
-        scopeAll: 1.756,
-        exMedRel: 0.722,
-        exMedRelPers: 1.252,
-        cov70: 0.641,
-        cov90: 1.548,
-        lives: 0.103
-      }
+const mxlSDs = {
+  AU: {
+    mild: {
+      ascPolicyA: 1.104,
+      ascOptOut: 5.340,
+      scopeAll: 1.731,
+      exMedRel: 0.443,
+      exMedRelPers: 1.254,
+      cov70: 0.698,
+      cov90: 1.689,
+      lives: 0.101
     },
-    IT: {
-      mild: {
-        ascPolicyA: 1.560,
-        ascOptOut: 4.748,
-        scopeAll: 1.601,
-        exMedRel: 0.718,
-        exMedRelPers: 1.033,
-        cov70: 0.615,
-        cov90: 1.231,
-        lives: 0.080
-      },
-      severe: {
-        ascPolicyA: 1.518,
-        ascOptOut: 4.194,
-        scopeAll: 1.448,
-        exMedRel: 0.575,
-        exMedRelPers: 1.082,
-        cov70: 0.745,
-        cov90: 1.259,
-        lives: 0.082
-      }
+    severe: {
+      ascPolicyA: 1.019,
+      ascOptOut: 5.021,
+      scopeAll: 1.756,
+      exMedRel: 0.722,
+      exMedRelPers: 1.252,
+      cov70: 0.641,
+      cov90: 1.548,
+      lives: 0.103
+    }
+  },
+  IT: {
+    mild: {
+      ascPolicyA: 1.560,
+      ascOptOut: 4.748,
+      scopeAll: 1.601,
+      exMedRel: 0.718,
+      exMedRelPers: 1.033,
+      cov70: 0.615,
+      cov90: 1.231,
+      lives: 0.080
     },
-    FR: {
-      mild: {
-        ascPolicyA: 1.560,
-        ascOptOut: 4.138,
-        scopeAll: 1.258,
-        exMedRel: 0.818,
-        exMedRelPers: 0.972,
-        cov70: 0.550,
-        cov90: 1.193,
-        lives: 0.081
-      },
-      severe: {
-        ascPolicyA: 1.601,
-        ascOptOut: 3.244,
-        scopeAll: 1.403,
-        exMedRel: 0.690,
-        exMedRelPers: 1.050,
-        cov70: 0.548,
-        cov90: 1.145,
-        lives: 0.085
-      }
+    severe: {
+      ascPolicyA: 1.518,
+      ascOptOut: 4.194,
+      scopeAll: 1.448,
+      exMedRel: 0.575,
+      exMedRelPers: 1.082,
+      cov70: 0.745,
+      cov90: 1.259,
+      lives: 0.082
     }
-  };
-
-  const NUM_MXL_DRAWS = 1000;
-
-  /* Helpers */
-
-  function randStdNormal() {
-    // Box–Muller transform for standard normal draws
-    let u = 0, v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
-    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-  }
-
-  function computeSupportFromMXL(config) {
-    const country = config.country || 'AU';
-    const outbreak = config.outbreak || 'mild';
-    const countryCoefs = mxlCoefs[country];
-    const countrySDs = mxlSDs[country];
-    if (!countryCoefs || !countrySDs) return null;
-
-    const mean = countryCoefs[outbreak];
-    const sd = countrySDs[outbreak];
-    if (!mean || !sd) return null;
-
-    const livesPer100k = config.livesPer100k || 0;
-    const scope = config.scope || 'highrisk';
-    const exemptions = config.exemptions || 'medical';
-    const coverage = config.coverage || 0.5;
-
-    let probSum = 0;
-
-    for (let r = 0; r < NUM_MXL_DRAWS; r++) {
-      const beta = {
-        ascPolicyA: mean.ascPolicyA + (sd.ascPolicyA || 0) * randStdNormal(),
-        ascOptOut: mean.ascOptOut + (sd.ascOptOut || 0) * randStdNormal(),
-        scopeAll: mean.scopeAll + (sd.scopeAll || 0) * randStdNormal(),
-        exMedRel: mean.exMedRel + (sd.exMedRel || 0) * randStdNormal(),
-        exMedRelPers: mean.exMedRelPers + (sd.exMedRelPers || 0) * randStdNormal(),
-        cov70: mean.cov70 + (sd.cov70 || 0) * randStdNormal(),
-        cov90: mean.cov90 + (sd.cov90 || 0) * randStdNormal(),
-        lives: mean.lives + (sd.lives || 0) * randStdNormal()
-      };
-
-      let uMandate = beta.ascPolicyA;
-      let uOptOut = beta.ascOptOut;
-
-      if (scope === 'all') {
-        uMandate += beta.scopeAll;
-      }
-
-      if (exemptions === 'medrel') {
-        uMandate += beta.exMedRel;
-      } else if (exemptions === 'medrelpers') {
-        uMandate += beta.exMedRelPers;
-      }
-
-      if (coverage === 0.7) {
-        uMandate += beta.cov70;
-      } else if (coverage === 0.9) {
-        uMandate += beta.cov90;
-      }
-
-      uMandate += beta.lives * livesPer100k;
-
-      // Two-alternative logit: mandate vs opt-out
-      const diff = uMandate - uOptOut;
-      const pMandate = 1 / (1 + Math.exp(-diff));
-      probSum += pMandate;
+  },
+  FR: {
+    mild: {
+      ascPolicyA: 1.560,
+      ascOptOut: 4.138,
+      scopeAll: 1.258,
+      exMedRel: 0.818,
+      exMedRelPers: 0.972,
+      cov70: 0.550,
+      cov90: 1.193,
+      lives: 0.081
+    },
+    severe: {
+      ascPolicyA: 1.601,
+      ascOptOut: 3.244,
+      scopeAll: 1.403,
+      exMedRel: 0.690,
+      exMedRelPers: 1.050,
+      cov70: 0.548,
+      cov90: 1.145,
+      lives: 0.085
     }
-
-    // Return average probability in [0,1]
-    return probSum / NUM_MXL_DRAWS;
   }
+};
+
+const NUM_MXL_DRAWS = 1000;
+const coeffNames = [
+  'ascPolicyA',
+  'ascOptOut',
+  'scopeAll',
+  'exMedRel',
+  'exMedRelPers',
+  'cov70',
+  'cov90',
+  'lives'
+];
+
+let standardNormalDraws = [];
+let bcrChart = null;
+let supportChart = null;
 
 /* =========================================================
-   UI initialisation
+   Random draws – deterministic set per session
    ========================================================= */
 
-function init(){
-    initTabs();
-    initRangeDisplay();
-    initTooltips();
-    loadFromStorage();
-    attachEventHandlers();
-    updateAll();
+function randStdNormal() {
+  // Box–Muller using the seeded PRNG
+  let u = 0;
+  let v = 0;
+  while (u === 0) u = prng();
+  while (v === 0) v = prng();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+function generateStandardNormalDraws() {
+  standardNormalDraws = new Array(NUM_MXL_DRAWS);
+  for (let r = 0; r < NUM_MXL_DRAWS; r++) {
+    const obj = {};
+    coeffNames.forEach(name => {
+      obj[name] = randStdNormal();
+    });
+    standardNormalDraws[r] = obj;
+  }
+}
+
+/* =========================================================
+   Predicted support from mixed logit
+   ========================================================= */
+
+function computeSupportFromMXL(config) {
+  if (!config) return null;
+  const country = config.country || 'AU';
+  const outbreak = config.outbreak || 'mild';
+  const countryCoefs = mxlCoefs[country];
+  const countrySDs = mxlSDs[country];
+  if (!countryCoefs || !countrySDs) return null;
+
+  const mean = countryCoefs[outbreak];
+  const sd = countrySDs[outbreak];
+  if (!mean || !sd) return null;
+
+  const livesPer100k = config.livesPer100k || 0;
+  const scope = config.scope || 'highrisk';
+  const exemptions = config.exemptions || 'medical';
+  const coverage = config.coverage || 0.5;
+
+  let probSum = 0;
+
+  for (let r = 0; r < NUM_MXL_DRAWS; r++) {
+    const z = standardNormalDraws[r];
+
+    const beta = {
+      ascPolicyA: mean.ascPolicyA + (sd.ascPolicyA || 0) * z.ascPolicyA,
+      ascOptOut: mean.ascOptOut + (sd.ascOptOut || 0) * z.ascOptOut,
+      scopeAll: mean.scopeAll + (sd.scopeAll || 0) * z.scopeAll,
+      exMedRel: mean.exMedRel + (sd.exMedRel || 0) * z.exMedRel,
+      exMedRelPers: mean.exMedRelPers + (sd.exMedRelPers || 0) * z.exMedRelPers,
+      cov70: mean.cov70 + (sd.cov70 || 0) * z.cov70,
+      cov90: mean.cov90 + (sd.cov90 || 0) * z.cov90,
+      lives: mean.lives + (sd.lives || 0) * z.lives
+    };
+
+    let uMandate = beta.ascPolicyA;
+    let uOptOut = beta.ascOptOut;
+
+    // Scope
+    if (scope === 'all') {
+      uMandate += beta.scopeAll;
+    }
+
+    // Exemptions
+    if (exemptions === 'medrel') {
+      uMandate += beta.exMedRel;
+    } else if (exemptions === 'medrelpers') {
+      uMandate += beta.exMedRelPers;
+    }
+
+    // Coverage (50% is reference)
+    if (coverage === 0.7) {
+      uMandate += beta.cov70;
+    } else if (coverage === 0.9) {
+      uMandate += beta.cov90;
+    }
+
+    // Lives saved attribute
+    uMandate += beta.lives * livesPer100k;
+
+    // Two-alternative logit: mandate vs opt-out
+    const diff = uMandate - uOptOut;
+    const pMandate = 1 / (1 + Math.exp(-diff));
+    probSum += pMandate;
+  }
+
+  return probSum / NUM_MXL_DRAWS;
+}
+
+/* =========================================================
+   Initialisation
+   ========================================================= */
+
+function init() {
+  initTabs();
+  initRangeDisplay();
+  initTooltips();
+  generateStandardNormalDraws();
+  updateSettingsFromForm();
+  loadFromStorage();
+  attachEventHandlers();
+  updateAll();
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -261,7 +322,8 @@ function initTabs() {
       links.forEach(b => b.classList.remove('active'));
       tabs.forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
-      document.getElementById(tabId).classList.add('active');
+      const target = document.getElementById(tabId);
+      if (target) target.classList.add('active');
     });
   });
 }
@@ -278,6 +340,36 @@ function initRangeDisplay() {
   };
   range.addEventListener('input', update);
   update();
+}
+
+/* Tooltips */
+
+function initTooltips() {
+  const tooltip = document.getElementById('globalTooltip');
+  if (!tooltip) return;
+
+  const hide = () => {
+    tooltip.classList.add('tooltip-hidden');
+    tooltip.textContent = '';
+  };
+
+  document.querySelectorAll('[data-tooltip]').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      const rect = el.getBoundingClientRect();
+      tooltip.textContent = el.getAttribute('data-tooltip') || '';
+      tooltip.classList.remove('tooltip-hidden');
+      const top = rect.bottom + window.scrollY + 8;
+      const left = rect.left + window.scrollX;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+    });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('blur', hide);
+  });
+
+  window.addEventListener('scroll', () => {
+    tooltip.classList.add('tooltip-hidden');
+  });
 }
 
 /* =========================================================
@@ -308,9 +400,16 @@ function saveToStorage() {
    ========================================================= */
 
 function attachEventHandlers() {
+  const btnApplySettings = document.getElementById('btn-apply-settings');
   const btnApplyConfig = document.getElementById('btn-apply-config');
   const btnSaveScenario = document.getElementById('btn-save-scenario');
   const btnApplyCosts = document.getElementById('btn-apply-costs');
+
+  if (btnApplySettings) {
+    btnApplySettings.addEventListener('click', () => {
+      applySettingsFromForm();
+    });
+  }
 
   if (btnApplyConfig) {
     btnApplyConfig.addEventListener('click', () => {
@@ -333,22 +432,6 @@ function attachEventHandlers() {
       showToast('Costs applied.', 'success');
     });
   }
-
-  const settingIds = [
-    'setting-horizon',
-    'setting-population',
-    'setting-currency',
-    'setting-vsl-metric',
-    'setting-vsl'
-  ];
-  settingIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('change', () => {
-      updateSettingsFromForm();
-      updateAll();
-    });
-  });
 
   const btnCopyBriefing = document.getElementById('btn-copy-briefing');
   if (btnCopyBriefing) {
@@ -402,6 +485,7 @@ function attachEventHandlers() {
       state.scenarios = [];
       saveToStorage();
       rebuildScenariosTable();
+      updateScenarioBriefingCurrent();
       showToast('All saved scenarios cleared from this browser.', 'warning');
     });
   }
@@ -427,6 +511,15 @@ function updateSettingsFromForm() {
   };
 }
 
+function applySettingsFromForm() {
+  updateSettingsFromForm();
+  if (state.config) {
+    state.derived = computeDerived(state.settings, state.config, state.costs);
+  }
+  updateAll();
+  showToast('Settings applied.', 'success');
+}
+
 function applyConfigFromForm() {
   const country = document.getElementById('cfg-country').value;
   const outbreak = document.getElementById('cfg-outbreak').value;
@@ -444,7 +537,6 @@ function applyConfigFromForm() {
     livesPer100k
   };
 
-  // After configuration, recompute derived metrics
   state.derived = computeDerived(state.settings, state.config, state.costs);
 }
 
@@ -511,8 +603,7 @@ function computeDerived(settings, config, costs) {
    ========================================================= */
 
 function updateAll() {
-  updateSettingsFromForm();
-  if (!state.derived && state.config) {
+  if (state.config && !state.derived) {
     state.derived = computeDerived(state.settings, state.config, state.costs);
   }
 
@@ -522,6 +613,7 @@ function updateAll() {
   rebuildScenariosTable();
   updateBriefingTemplate();
   updateAiPrompt();
+  updateScenarioBriefingCurrent();
 }
 
 function updateConfigSummary() {
@@ -546,6 +638,7 @@ function updateConfigSummary() {
       elHeadline.textContent =
         'No configuration applied yet. Configure country, outbreak scenario and design, then click “Apply configuration” to see a summary.';
     }
+    updateStatusChips(null, null);
     return;
   }
 
@@ -567,23 +660,30 @@ function updateConfigSummary() {
 
     let rating;
     if (supp >= 70 && bcr && bcr >= 1) {
-      rating = 'This mandate option combines high predicted public support with a beneficial benefit–cost profile.';
+      rating =
+        'This mandate option combines high predicted public support with a favourable benefit–cost profile given the current assumptions.';
     } else if (supp >= 60 && bcr && bcr >= 1) {
-      rating = 'This mandate option has broadly favourable support and a positive benefit–cost profile.';
+      rating =
+        'This mandate option has broadly favourable support and a positive benefit–cost profile, but still involves important trade-offs.';
     } else if (supp < 50 && (!bcr || bcr < 1)) {
-      rating = 'This mandate option has limited predicted support and a weak benefit–cost profile – it may be difficult to justify without mitigation measures.';
+      rating =
+        'This mandate option has limited predicted support and a weak benefit–cost profile; it may be difficult to justify without additional measures.';
     } else {
-      rating = 'This mandate option involves trade-offs between public support and the economic valuation of lives saved.';
+      rating =
+        'This mandate option involves trade-offs between public support and the economic valuation of lives saved. It warrants careful deliberation.';
     }
 
-    const costText = d.costTotal > 0
-      ? `Indicative implementation cost is about ${formatCurrency(d.costTotal, cur)}.`
-      : 'Implementation costs have not yet been entered, so the benefit–cost profile is incomplete.';
+    const costText =
+      d.costTotal > 0
+        ? `Indicative implementation cost is about ${formatCurrency(d.costTotal, cur)} over the selected horizon.`
+        : 'Implementation costs have not yet been entered, so the benefit–cost profile is incomplete.';
 
     elHeadline.textContent =
       `${rating} Predicted public support is approximately ${formatPercent(supp)}. ` +
       `The monetary valuation of lives saved is about ${formatCurrency(d.benefitMonetary, cur)}. ${costText}`;
   }
+
+  updateStatusChips(state.config, state.derived);
 }
 
 function updateCostSummary() {
@@ -613,12 +713,9 @@ function updateCostSummary() {
     if (comp.value > main.value) main = comp;
   });
 
-  if (elTotal) elTotal.textContent = formatCurrency(total, cur);
+  if (elTotal) elTotal.textContent = total > 0 ? formatCurrency(total, cur) : 'Not yet entered';
   if (elMain) elMain.textContent = total > 0 ? `${main.label} (${formatCurrency(main.value, cur)})` : '–';
 }
-
-let bcrChart = null;
-let supportChart = null;
 
 function updateResultsSummary() {
   const d = state.derived;
@@ -644,37 +741,101 @@ function updateResultsSummary() {
       elNarrative.textContent =
         'Apply a configuration and, if possible, enter costs to see a narrative summary of cost–benefit performance and model-based public support for the mandate.';
     }
-    updateMRSSection(null, null);
+    updateMRSSection(null);
     updateCharts(null, null);
+    updateStatusChips(null, null);
     return;
   }
 
   if (elLivesTotal) elLivesTotal.textContent = `${d.livesTotal.toFixed(1)} lives`;
   if (elBenefit) elBenefit.textContent = formatCurrency(d.benefitMonetary, cur);
-  if (elCost) elCost.textContent = d.costTotal > 0 ? formatCurrency(d.costTotal, cur) : 'Not yet entered';
+  if (elCost) elCost.textContent = d.costTotal > 0 ? formatCurrency(d.costTotal, cur) : 'Costs not entered';
   if (elNet) elNet.textContent = formatCurrency(d.netBenefit, cur);
-  if (elBcr) elBcr.textContent = d.bcr != null ? d.bcr.toFixed(2) : '–';
+  if (elBcr) elBcr.textContent = d.bcr != null ? d.bcr.toFixed(2) : 'not defined';
   if (elSupport) elSupport.textContent = formatPercent((d.support || 0) * 100);
 
   if (elNarrative) {
     const supp = (d.support || 0) * 100;
     const suppText = `Predicted public support for this configuration is approximately ${formatPercent(supp)}.`;
-    const costText = d.costTotal > 0
-      ? `Total implementation cost is around ${formatCurrency(d.costTotal, cur)}, generating an estimated benefit–cost ratio of ${d.bcr != null ? d.bcr.toFixed(2) : '–'}.`
-      : 'Implementation costs have not been entered, so only benefits and support can be interpreted at this stage.';
-    const benefitText = `The DCE-based expected lives saved parameter implies about ${d.livesTotal.toFixed(1)} lives saved in the exposed population, valued at approximately ${formatCurrency(d.benefitMonetary, cur)}.`;
+    const costText =
+      d.costTotal > 0
+        ? `Total implementation cost is around ${formatCurrency(
+            d.costTotal,
+            cur
+          )}, generating an estimated benefit–cost ratio of ${d.bcr != null ? d.bcr.toFixed(2) : 'not defined'}.`
+        : 'Implementation costs have not been entered, so only benefits and support can be interpreted at this stage.';
+    const benefitText = `The expected lives saved parameter implies about ${d.livesTotal.toFixed(
+      1
+    )} lives saved in the exposed population, valued at approximately ${formatCurrency(d.benefitMonetary, cur)}.`;
     elNarrative.textContent = `${suppText} ${benefitText} ${costText}`;
   }
 
-  updateMRSSection(c, d);
+  updateMRSSection(c);
   updateCharts(d, settings);
+  updateStatusChips(c, d);
+}
+
+/* Status chips for support and BCR */
+
+function updateStatusChips(config, derived) {
+  const chipSupport = document.getElementById('status-support');
+  const chipBcr = document.getElementById('status-bcr');
+
+  if (!chipSupport || !chipBcr) return;
+
+  if (!config || !derived) {
+    chipSupport.textContent = 'Support: –';
+    chipSupport.className = 'status-chip status-neutral';
+    chipBcr.textContent = 'BCR: –';
+    chipBcr.className = 'status-chip status-neutral';
+    return;
+  }
+
+  const supp = (derived.support || 0) * 100;
+  let supportClass = 'status-chip ';
+  let supportText;
+
+  if (supp < 50) {
+    supportClass += 'status-bad';
+    supportText = 'Support: Low';
+  } else if (supp < 70) {
+    supportClass += 'status-med';
+    supportText = 'Support: Medium';
+  } else {
+    supportClass += 'status-good';
+    supportText = 'Support: High';
+  }
+
+  chipSupport.textContent = supportText;
+  chipSupport.className = supportClass;
+
+  const bcr = derived.bcr;
+  let bcrClass = 'status-chip ';
+  let bcrText;
+
+  if (bcr == null) {
+    bcrClass += 'status-neutral';
+    bcrText = 'BCR: Not defined';
+  } else if (bcr < 0.8) {
+    bcrClass += 'status-bad';
+    bcrText = 'BCR: Unfavourable';
+  } else if (bcr < 1.0) {
+    bcrClass += 'status-med';
+    bcrText = 'BCR: Uncertain';
+  } else {
+    bcrClass += 'status-good';
+    bcrText = 'BCR: Favourable';
+  }
+
+  chipBcr.textContent = bcrText;
+  chipBcr.className = bcrClass;
 }
 
 /* =========================================================
    MRS section (lives-saved equivalents)
    ========================================================= */
 
-function updateMRSSection(config, derived) {
+function updateMRSSection(config) {
   const tableBody = document.querySelector('#mrs-table tbody');
   const mrsNarr = document.getElementById('mrsNarrative');
   if (!tableBody) return;
@@ -704,23 +865,23 @@ function updateMRSSection(config, derived) {
   if (config.scope === 'all') {
     const mrsScope = -coefs.scopeAll / betaLives;
     rows.push({
-      attribute: 'Broader scope: high-risk occupations → all occupations & public spaces',
+      attribute: 'Scope: high-risk occupations → all occupations & public spaces',
       value: mrsScope,
       interpretation:
         mrsScope >= 0
-          ? `This change is as costly in terms of public acceptability as reducing expected lives saved by about ${mrsScope.toFixed(
+          ? `This change is as demanding in acceptability terms as losing about ${mrsScope.toFixed(
               1
-            )} per 100,000 people.`
-          : `This change increases acceptability, similar to gaining about ${Math.abs(mrsScope).toFixed(
-              1
-            )} extra lives saved per 100,000 people.`
+            )} expected lives saved per 100,000 people.`
+          : `This change increases acceptability, similar to gaining about ${Math.abs(
+              mrsScope
+            ).toFixed(1)} expected lives saved per 100,000 people.`
     });
   }
 
   if (config.exemptions === 'medrel') {
     const mrsExMedRel = -coefs.exMedRel / betaLives;
     rows.push({
-      attribute: 'Broader exemptions: medical only → medical + religious',
+      attribute: 'Exemptions: medical only → medical + religious',
       value: mrsExMedRel,
       interpretation:
         mrsExMedRel >= 0
@@ -734,7 +895,7 @@ function updateMRSSection(config, derived) {
   } else if (config.exemptions === 'medrelpers') {
     const mrsExMedRelPers = -coefs.exMedRelPers / betaLives;
     rows.push({
-      attribute: 'Broader exemptions: medical only → medical + religious + personal belief',
+      attribute: 'Exemptions: medical only → medical + religious + personal belief',
       value: mrsExMedRelPers,
       interpretation:
         mrsExMedRelPers >= 0
@@ -750,11 +911,11 @@ function updateMRSSection(config, derived) {
   if (config.coverage === 0.7) {
     const mrsCov = -coefs.cov70 / betaLives;
     rows.push({
-      attribute: 'Higher lifting threshold: 50% → 70% vaccinated',
+      attribute: 'Coverage threshold: 50% → 70% vaccinated',
       value: mrsCov,
       interpretation:
         mrsCov >= 0
-          ? `Raising the lifting threshold to 70% is as demanding in preference terms as losing about ${mrsCov.toFixed(
+          ? `Raising the lifting threshold to 70% is as demanding as losing about ${mrsCov.toFixed(
               1
             )} expected lives saved per 100,000.`
           : `Raising the lifting threshold to 70% is viewed as beneficial, similar to gaining about ${Math.abs(
@@ -764,7 +925,7 @@ function updateMRSSection(config, derived) {
   } else if (config.coverage === 0.9) {
     const mrsCov = -coefs.cov90 / betaLives;
     rows.push({
-      attribute: 'Higher lifting threshold: 50% → 90% vaccinated',
+      attribute: 'Coverage threshold: 50% → 90% vaccinated',
       value: mrsCov,
       interpretation:
         mrsCov >= 0
@@ -777,7 +938,7 @@ function updateMRSSection(config, derived) {
     });
   }
 
-  rows.forEach(row => {
+  rows.slice(0, 3).forEach(row => {
     const tr = document.createElement('tr');
     const tdAttr = document.createElement('td');
     const tdVal = document.createElement('td');
@@ -794,12 +955,12 @@ function updateMRSSection(config, derived) {
   });
 
   if (mrsNarr) {
-    if (rows.length === 0) {
+    if (!rows.length) {
       mrsNarr.textContent =
         'Under the current configuration there is no attribute change to contrast, so lives-saved equivalents (MRS) are not displayed.';
     } else {
       mrsNarr.textContent =
-        'Lives-saved equivalents interpret how strongly people care about mandate design features in terms of “extra lives saved per 100,000 people”. Positive values reflect changes that reduce acceptability; negative values reflect changes that increase acceptability.';
+        'Lives-saved equivalents show how strongly people care about mandate design features in terms of “extra lives saved per 100,000 people”. Positive values reflect changes that reduce acceptability; negative values reflect changes that increase acceptability.';
     }
   }
 }
@@ -828,11 +989,8 @@ function updateCharts(derived, settings) {
       datasets: [
         {
           label: `Values (${cur})`,
-          data: [
-            derived.benefitMonetary || 0,
-            derived.costTotal || 0,
-            derived.netBenefit || 0
-          ]
+          data: [derived.benefitMonetary || 0, derived.costTotal || 0, derived.netBenefit || 0],
+          backgroundColor: ['#1f6feb', '#e5e7eb', '#00a3a3']
         }
       ]
     },
@@ -856,6 +1014,14 @@ function updateCharts(derived, settings) {
     }
   });
 
+  const suppPct = ((derived.support || 0) * 100);
+  let supportColor = '#ef4444'; // red
+  if (suppPct >= 70) {
+    supportColor = '#059669'; // green
+  } else if (suppPct >= 50) {
+    supportColor = '#f59e0b'; // amber
+  }
+
   supportChart = new Chart(ctxSupport, {
     type: 'bar',
     data: {
@@ -863,7 +1029,8 @@ function updateCharts(derived, settings) {
       datasets: [
         {
           label: 'Support (%)',
-          data: [((derived.support || 0) * 100).toFixed(1)]
+          data: [parseFloat(suppPct.toFixed(1))],
+          backgroundColor: [supportColor]
         }
       ]
     },
@@ -912,6 +1079,7 @@ function saveScenario() {
   state.scenarios.push(s);
   saveToStorage();
   rebuildScenariosTable();
+  populateScenarioBriefing(s);
   showToast('Scenario saved.', 'success');
 }
 
@@ -940,7 +1108,7 @@ function rebuildScenariosTable() {
       c.livesPer100k.toFixed(1),
       d ? d.livesTotal.toFixed(1) : '–',
       d ? formatShortCurrency(d.benefitMonetary, cur) : '–',
-      d ? formatShortCurrency(d.costTotal, cur) : '–',
+      d ? (d.costTotal > 0 ? formatShortCurrency(d.costTotal, cur) : '–') : '–',
       d ? formatShortCurrency(d.netBenefit, cur) : '–',
       d && d.bcr != null ? d.bcr.toFixed(2) : '–',
       d ? formatPercent((d.support || 0) * 100) : '–'
@@ -983,16 +1151,54 @@ function populateScenarioBriefing(scenario) {
       d.benefitMonetary,
       cur
     )}.\n` +
-    `Total implementation cost (as entered): ${formatCurrency(d.costTotal, cur)}, giving a net benefit of ${formatCurrency(
+    `Total implementation cost (as entered): ${
+      d.costTotal > 0 ? formatCurrency(d.costTotal, cur) : 'costs not entered'
+    }, giving a net benefit of ${formatCurrency(
       d.netBenefit,
       cur
-    )} and a benefit–cost ratio of ${d.bcr != null ? d.bcr.toFixed(2) : 'not yet defined'}.\n` +
-    `Model-based predicted public support for this mandate is approximately ${formatPercent(supp)}.`;
+    )} and a benefit–cost ratio of ${d.bcr != null ? d.bcr.toFixed(2) : 'not defined'}.\n` +
+    `Model-based predicted public support for this mandate is approximately ${formatPercent(supp)}.\n` +
+    `Interpretation: This summary can be pasted into emails or briefing documents and should be read alongside qualitative, ethical and legal considerations that are not captured in the preference study or the simple economic valuation used here.`;
 
   txt.value = text;
 }
 
-/* Simple exports – CSV/Excel share the same underlying CSV; PDF/Word placeholders stay lightweight */
+function updateScenarioBriefingCurrent() {
+  const txt = document.getElementById('scenario-briefing-text');
+  if (!txt) return;
+
+  if (!state.config || !state.derived) {
+    txt.value =
+      'Once you apply a configuration (and optionally enter costs), this box will show a short, plain-language summary of the current scenario ready to copy into emails or reports.';
+    return;
+  }
+
+  const c = state.config;
+  const d = state.derived;
+  const cur = state.settings.currencyLabel;
+  const supp = (d.support || 0) * 100;
+
+  const text =
+    `Current configuration – ${countryLabel(c.country)}, ${outbreakLabel(c.outbreak)}.\n` +
+    `Scope: ${scopeLabel(c.scope)}; exemptions: ${exemptionsLabel(c.exemptions)}; coverage threshold: ${coverageLabel(
+      c.coverage
+    )}.\n` +
+    `Expected lives saved: ${c.livesPer100k.toFixed(
+      1
+    )} per 100,000 people (≈${d.livesTotal.toFixed(1)} lives saved in the exposed population).\n` +
+    `Monetary value of lives saved: ${formatCurrency(d.benefitMonetary, cur)}.\n` +
+    `Implementation cost (if entered): ${
+      d.costTotal > 0 ? formatCurrency(d.costTotal, cur) : 'not yet entered'
+    }; net benefit: ${formatCurrency(d.netBenefit, cur)}; BCR: ${
+      d.bcr != null ? d.bcr.toFixed(2) : 'not defined'
+    }.\n` +
+    `Predicted public support: ${formatPercent(supp)}.\n` +
+    `Use this text as a starting point and add context on feasibility, distributional impacts and ethical considerations.`;
+
+  txt.value = text;
+}
+
+/* Exports */
 
 function exportScenarios(kind) {
   if (!state.scenarios.length) {
@@ -1035,7 +1241,7 @@ function exportScenarios(kind) {
       d.costTotal || '',
       d.netBenefit || '',
       d.bcr != null ? d.bcr : '',
-      (d.support || 0),
+      d.support || '',
       cur,
       s.timestamp
     ];
@@ -1071,42 +1277,123 @@ function exportScenarios(kind) {
     a.download = 'mandeval_scenarios_summary.csv';
     a.click();
     URL.revokeObjectURL(url);
-    showToast('Summary data exported as CSV for use in PDF reporting tools.', 'success');
+    showToast('Summary data exported as CSV for use in PDF/reporting tools.', 'success');
     return;
   }
 
   if (kind === 'word') {
-    const textParts = state.scenarios.map(s => {
-      const c = s.config;
-      const d = s.derived || {};
-      const cur = s.settings.currencyLabel;
-      const supp = (d.support || 0) * 100;
-      return (
-        `Scenario ${s.id} – ${countryLabel(c.country)}, ${outbreakLabel(c.outbreak)}\n` +
-        `Scope: ${scopeLabel(c.scope)}; exemptions: ${exemptionsLabel(
-          c.exemptions
-        )}; coverage threshold: ${coverageLabel(c.coverage)}.\n` +
-        `Lives saved: ${d.livesTotal ? d.livesTotal.toFixed(1) : '–'}; benefit: ${formatCurrency(
-          d.benefitMonetary || 0,
-          cur
-        )}; cost: ${formatCurrency(d.costTotal || 0, cur)}; net benefit: ${formatCurrency(
-          d.netBenefit || 0,
-          cur
-        )}; BCR: ${d.bcr != null ? d.bcr.toFixed(2) : '–'}.\n` +
-        `Predicted public support: ${formatPercent(supp)}.\n`
-      );
-    });
-
-    const blobTxt = new Blob([textParts.join('\n\n')], { type: 'text/plain;charset=utf-8;' });
-    const url = URL.createObjectURL(blobTxt);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mandeval_scenarios_briefing.txt';
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('Plain-text briefing exported (import into Word for formatting).', 'success');
+    exportScenariosAsWord();
     return;
   }
+}
+
+function exportScenariosAsWord() {
+  const title = 'MANDEVAL – Vaccine Mandate Scenario Briefings';
+  const now = new Date().toLocaleString();
+
+  let html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${escapeHtml(title)}</title>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #1f2933; }
+  h1 { font-size: 16pt; margin-bottom: 4pt; }
+  h2 { font-size: 13pt; margin-top: 12pt; margin-bottom: 4pt; }
+  h3 { font-size: 11pt; margin-top: 8pt; margin-bottom: 3pt; }
+  p { margin: 2pt 0; }
+  ul { margin: 0 0 4pt 18pt; padding: 0; }
+  li { margin: 0 0 2pt 0; }
+  .meta { font-size: 9pt; color: #6b7280; margin-bottom: 8pt; }
+  .section { margin-bottom: 10pt; }
+  .label { font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>${escapeHtml(title)}</h1>
+<p class="meta">Generated on ${escapeHtml(
+    now
+  )}. Each scenario is based on mixed logit preference estimates and user-entered settings in the MANDEVAL tool.</p>
+`;
+
+  state.scenarios.forEach(s => {
+    const c = s.config;
+    const d = s.derived || {};
+    const set = s.settings || state.settings;
+    const cur = set.currencyLabel;
+    const supp = (d.support || 0) * 100;
+
+    html += `<div class="section">`;
+    html += `<h2>Scenario ${s.id}: ${escapeHtml(countryLabel(c.country))} – ${escapeHtml(
+      outbreakLabel(c.outbreak)
+    )}</h2>`;
+    html += `<p><span class="label">Time stamp:</span> ${escapeHtml(s.timestamp)}</p>`;
+
+    html += `<h3>Mandate configuration</h3><ul>`;
+    html += `<li><span class="label">Scope:</span> ${escapeHtml(scopeLabel(c.scope))}</li>`;
+    html += `<li><span class="label">Exemptions:</span> ${escapeHtml(exemptionsLabel(c.exemptions))}</li>`;
+    html += `<li><span class="label">Coverage requirement to lift mandate:</span> ${escapeHtml(
+      coverageLabel(c.coverage)
+    )}</li>`;
+    html += `<li><span class="label">Expected lives saved:</span> ${c.livesPer100k.toFixed(
+      1
+    )} per 100,000 people</li>`;
+    html += `<li><span class="label">Population covered:</span> ${set.population.toLocaleString()} people</li>`;
+    html += `</ul>`;
+
+    html += `<h3>Epidemiological benefit and monetary valuation</h3><ul>`;
+    html += `<li><span class="label">Total lives saved (approx.):</span> ${
+      d.livesTotal ? d.livesTotal.toFixed(1) : '–'
+    } lives</li>`;
+    html += `<li><span class="label">Value per life saved:</span> ${formatCurrency(set.vslValue, cur)}</li>`;
+    html += `<li><span class="label">Monetary benefit of lives saved:</span> ${formatCurrency(
+      d.benefitMonetary || 0,
+      cur
+    )}</li>`;
+    html += `</ul>`;
+
+    html += `<h3>Costs and benefit–cost profile</h3><ul>`;
+    html += `<li><span class="label">Total implementation cost (as entered):</span> ${formatCurrency(
+      d.costTotal || 0,
+      cur
+    )}</li>`;
+    html += `<li><span class="label">Net benefit (benefit − cost):</span> ${formatCurrency(
+      d.netBenefit || 0,
+      cur
+    )}</li>`;
+    html += `<li><span class="label">Benefit–cost ratio (BCR):</span> ${
+      d.bcr != null ? d.bcr.toFixed(2) : 'not defined'
+    }</li>`;
+    html += `</ul>`;
+
+    html += `<h3>Model-based public support</h3><ul>`;
+    html += `<li><span class="label">Predicted public support:</span> ${formatPercent(supp)}</li>`;
+    html += `</ul>`;
+
+    html += `<h3>Interpretation (for policy discussion)</h3>`;
+    html += `<p>This scenario combines the model-based estimate of public support with a simple valuation of lives saved and indicative implementation costs. `;
+    html += `Predicted support of ${formatPercent(
+      supp
+    )} should be interpreted as an indicative acceptance level under the stated outbreak scenario and mandate design, not as a forecast. `;
+    html += `Net benefit and the benefit–cost ratio summarise the trade-off between epidemiological benefit and implementation cost, but do not capture important `;
+    html += `ethical, legal, distributional or political considerations. These figures should therefore be read alongside qualitative judgements and stakeholder input.</p>`;
+    html += `</div>`;
+  });
+
+  html += `<p class="meta">Note: All figures depend on the assumptions entered into MANDEVAL (population, value per life saved, cost inputs). For formal regulatory appraisal, the underlying data and assumptions should be checked and documented in a technical annex.</p>`;
+  html += `</body></html>`;
+
+  const blobDoc = new Blob([html], {
+    type: 'application/msword;charset=utf-8;'
+  });
+  const url = URL.createObjectURL(blobDoc);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'mandeval_scenarios_briefing.doc';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Word briefing downloaded (ready to print or edit).', 'success');
 }
 
 /* =========================================================
@@ -1148,16 +1435,18 @@ function updateBriefingTemplate() {
     `• Monetary value of lives saved: ${formatCurrency(d.benefitMonetary, cur)}\n\n` +
     `Costs and benefit–cost profile\n` +
     `• Total implementation cost (as entered): ${formatCurrency(d.costTotal, cur)}\n` +
-    `• Net benefit (benefit – cost): ${formatCurrency(d.netBenefit, cur)}\n` +
-    `• Benefit–cost ratio (BCR): ${d.bcr != null ? d.bcr.toFixed(2) : 'not yet defined'}\n\n` +
+    `• Net benefit (benefit − cost): ${formatCurrency(d.netBenefit, cur)}\n` +
+    `• Benefit–cost ratio (BCR): ${d.bcr != null ? d.bcr.toFixed(2) : 'not defined'}\n\n` +
     `Model-based public support\n` +
     `• Predicted public support for this mandate configuration: ${formatPercent(
       supp
     )}\n\n` +
     `Interpretation (to be tailored)\n` +
-    `This configuration appears to offer ${d.bcr != null && d.bcr >= 1 ? 'a favourable' : 'an uncertain'} balance between epidemiological benefit and implementation cost, with predicted public support at around ${formatPercent(
+    `This configuration appears to offer ${
+      d.bcr != null && d.bcr >= 1 ? 'a favourable' : 'an uncertain'
+    } balance between epidemiological benefit and implementation cost, with predicted public support at around ${formatPercent(
       supp
-    )}. These results should be interpreted alongside distributional, ethical and legal considerations that are not captured in the DCE or the simple economic valuation used here.`;
+    )}. These results should be interpreted alongside distributional, ethical and legal considerations that are not captured in the preference study or the simple economic valuation used here.`;
 
   el.value = text;
 }
@@ -1197,7 +1486,7 @@ function updateAiPrompt() {
     `- Estimated total lives saved: ${d.livesTotal.toFixed(1)}\n` +
     `- Monetary benefit of lives saved: ${formatCurrency(d.benefitMonetary, cur)}\n` +
     `- Net benefit: ${formatCurrency(d.netBenefit, cur)}\n` +
-    `- Benefit–cost ratio (BCR): ${d.bcr != null ? d.bcr.toFixed(2) : 'not yet defined'}\n` +
+    `- Benefit–cost ratio (BCR): ${d.bcr != null ? d.bcr.toFixed(2) : 'not defined'}\n` +
     `- Predicted public support (from mixed logit model): ${formatPercent(supp)}\n\n` +
     `TASK FOR YOU:\n` +
     `Draft a short, neutral and clear policy briefing that:\n` +
@@ -1234,37 +1523,6 @@ function showToast(message, type = 'info') {
       toast.remove();
     }, 500);
   }, 4500);
-}
-
-  function initTooltips(){
-    const tooltip = document.getElementById('globalTooltip');
-    if (!tooltip) return;
-    const hide = () => {
-      tooltip.classList.add('tooltip-hidden');
-      tooltip.textContent = '';
-    };
-    document.querySelectorAll('[data-tooltip]').forEach(el => {
-      el.addEventListener('mouseenter', () => {
-        const rect = el.getBoundingClientRect();
-        tooltip.textContent = el.getAttribute('data-tooltip') || '';
-        tooltip.classList.remove('tooltip-hidden');
-        const top = rect.bottom + window.scrollY + 8;
-        const left = rect.left + window.scrollX;
-        tooltip.style.top = top + 'px';
-        tooltip.style.left = left + 'px';
-      });
-      el.addEventListener('mouseleave', hide);
-      el.addEventListener('blur', hide);
-    });
-  }
-
-  function escapeHtml(str) {
-  if (str == null) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 /* =========================================================
@@ -1339,8 +1597,29 @@ function coverageLabel(val) {
 function copyFromTextarea(id) {
   const el = document.getElementById(id);
   if (!el) return;
+  const text = el.value || '';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast('Text copied to clipboard.', 'success'),
+      () => fallbackCopy(el)
+    );
+  } else {
+    fallbackCopy(el);
+  }
+}
+
+function fallbackCopy(el) {
   el.select();
   el.setSelectionRange(0, 99999);
   document.execCommand('copy');
   showToast('Text copied to clipboard.', 'success');
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
