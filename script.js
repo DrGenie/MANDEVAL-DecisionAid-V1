@@ -28,7 +28,7 @@ const state = {
     population: 1000000,
     currencyLabel: 'local currency units',
     vslMetric: 'vsl',
-    vslValue: 5000000
+    vslValue: 5400000
   },
   config: null,
   costs: null,
@@ -39,7 +39,6 @@ const state = {
 /* =========================================================
    Mixed logit coefficient means and SDs
    (ASC Policy A, ASC Opt-out, scope, exemptions, coverage, lives)
-   Coverage coefficients as estimated in the study.
    ========================================================= */
 
 const mxlCoefs = {
@@ -180,6 +179,44 @@ const mxlSDs = {
   }
 };
 
+/* =========================================================
+   Evidence-based / stylised per-capita cost defaults
+   Values are approximate, per 1 million people, per year,
+   in local currency units, varying by country and category.
+   ========================================================= */
+
+const COST_DEFAULTS_PER_MILLION = {
+  AU: {
+    itSystems: 1200000,
+    comms: 800000,
+    enforcement: 1800000,
+    compensation: 2200000,
+    admin: 800000,
+    other: 500000
+  },
+  FR: {
+    itSystems: 1000000,
+    comms: 700000,
+    enforcement: 1500000,
+    compensation: 1800000,
+    admin: 700000,
+    other: 400000
+  },
+  IT: {
+    itSystems: 900000,
+    comms: 600000,
+    enforcement: 1400000,
+    compensation: 1600000,
+    admin: 600000,
+    other: 400000
+  }
+};
+
+const COST_OUTBREAK_MULTIPLIER = {
+  mild: 0.8,
+  severe: 1.3
+};
+
 const NUM_MXL_DRAWS = 1000;
 const coeffNames = [
   'ascPolicyA',
@@ -192,9 +229,45 @@ const coeffNames = [
   'lives'
 ];
 
+const benefitMetricMeta = {
+  vsl: {
+    label: 'Value of statistical life (per life saved)',
+    defaults: {
+      AU: 5400000,
+      FR: 3000000,
+      IT: 2800000
+    }
+  },
+  vsly: {
+    label: 'Value of a statistical life-year (per life-year gained)',
+    defaults: {
+      AU: 230000,
+      FR: 100000,
+      IT: 80000
+    }
+  },
+  qalys: {
+    label: 'Monetary value per QALY gained',
+    defaults: {
+      AU: 50000,
+      FR: 40000,
+      IT: 30000
+    }
+  },
+  healthsys: {
+    label: 'Average health system cost savings per life saved',
+    defaults: {
+      AU: 100000,
+      FR: 80000,
+      IT: 60000
+    }
+  }
+};
+
 let standardNormalDraws = [];
 let bcrChart = null;
 let supportChart = null;
+let mrsChart = null;
 
 /* =========================================================
    Random draws – deterministic set per session
@@ -292,6 +365,67 @@ function computeSupportFromMXL(config) {
 }
 
 /* =========================================================
+   Benefit metric helpers
+   ========================================================= */
+
+function getCurrentCountryCode() {
+  const cfgSelect = document.getElementById('cfg-country');
+  const fallback = cfgSelect ? cfgSelect.value : 'AU';
+  return (state.config && state.config.country) || fallback || 'AU';
+}
+
+function updateBenefitMetricUI(options = { resetValue: false }) {
+  const metricSelect = document.getElementById('setting-vsl-metric');
+  const valueInput = document.getElementById('setting-vsl');
+  const labelEl = document.querySelector('label[for="setting-vsl"]');
+  if (!metricSelect || !valueInput || !labelEl) return;
+
+  const metric = metricSelect.value || 'vsl';
+  const country = getCurrentCountryCode();
+  const meta = benefitMetricMeta[metric];
+
+  if (meta) {
+    // Replace the label text before the info icon
+    const baseText = meta.label + ' ';
+    const childNodes = Array.from(labelEl.childNodes);
+    if (childNodes.length && childNodes[0].nodeType === Node.TEXT_NODE) {
+      childNodes[0].nodeValue = baseText;
+    } else {
+      labelEl.insertBefore(document.createTextNode(baseText), labelEl.firstChild);
+    }
+
+    if (options.resetValue && meta.defaults && meta.defaults[country] != null) {
+      valueInput.value = meta.defaults[country];
+    }
+  }
+}
+
+/* =========================================================
+   Evidence-based default costs
+   ========================================================= */
+
+function computeEvidenceBasedCosts(settings, config) {
+  if (!config) return null;
+  const country = config.country || 'AU';
+  const outbreak = config.outbreak || 'mild';
+  const perMillion = COST_DEFAULTS_PER_MILLION[country] || COST_DEFAULTS_PER_MILLION['AU'];
+  const multiplier = COST_OUTBREAK_MULTIPLIER[outbreak] || 1.0;
+  const pop = settings.population || 0;
+  const horizon = settings.horizonYears || 1;
+
+  const scale = (pop / 1000000) * horizon * multiplier;
+
+  return {
+    itSystems: Math.round(perMillion.itSystems * scale),
+    comms: Math.round(perMillion.comms * scale),
+    enforcement: Math.round(perMillion.enforcement * scale),
+    compensation: Math.round(perMillion.compensation * scale),
+    admin: Math.round(perMillion.admin * scale),
+    other: Math.round(perMillion.other * scale)
+  };
+}
+
+/* =========================================================
    Initialisation
    ========================================================= */
 
@@ -301,6 +435,7 @@ function init() {
   initTooltips();
   generateStandardNormalDraws();
   updateSettingsFromForm();
+  setupBenefitMetricHandlers();
   loadFromStorage();
   attachEventHandlers();
   updateAll();
@@ -372,13 +507,31 @@ function initTooltips() {
   });
 }
 
+/* Benefit metric handlers */
+
+function setupBenefitMetricHandlers() {
+  const metricSelect = document.getElementById('setting-vsl-metric');
+  if (!metricSelect) return;
+
+  metricSelect.addEventListener('change', () => {
+    updateBenefitMetricUI({ resetValue: true });
+    updateSettingsFromForm();
+    if (state.config) {
+      state.derived = computeDerived(state.settings, state.config, state.costs);
+    }
+    updateAll();
+  });
+
+  updateBenefitMetricUI({ resetValue: false });
+}
+
 /* =========================================================
    Storage
    ========================================================= */
 
 function loadFromStorage() {
   try {
-    const raw = localStorage.getItem('mandeValScenarios');
+    const raw = localStorage.getItem('mandeValScenariosFuture');
     if (raw) {
       state.scenarios = JSON.parse(raw);
     }
@@ -389,7 +542,7 @@ function loadFromStorage() {
 
 function saveToStorage() {
   try {
-    localStorage.setItem('mandeValScenarios', JSON.stringify(state.scenarios));
+    localStorage.setItem('mandeValScenariosFuture', JSON.stringify(state.scenarios));
   } catch (e) {
     console.warn('Could not save scenarios to storage', e);
   }
@@ -404,6 +557,8 @@ function attachEventHandlers() {
   const btnApplyConfig = document.getElementById('btn-apply-config');
   const btnSaveScenario = document.getElementById('btn-save-scenario');
   const btnApplyCosts = document.getElementById('btn-apply-costs');
+  const btnSaveScenarioCosts = document.getElementById('btn-save-scenario-costs');
+  const btnLoadDefaultCosts = document.getElementById('btn-load-default-costs');
 
   if (btnApplySettings) {
     btnApplySettings.addEventListener('click', () => {
@@ -430,6 +585,41 @@ function attachEventHandlers() {
       applyCostsFromForm();
       updateAll();
       showToast('Costs applied.', 'success');
+    });
+  }
+
+  if (btnSaveScenarioCosts) {
+    btnSaveScenarioCosts.addEventListener('click', () => {
+      if (!state.config) {
+        showToast('Apply a configuration before saving a scenario.', 'warning');
+        return;
+      }
+      applyCostsFromForm();
+      updateAll();
+      saveScenario();
+    });
+  }
+
+  if (btnLoadDefaultCosts) {
+    btnLoadDefaultCosts.addEventListener('click', () => {
+      if (!state.config) {
+        showToast('Apply a configuration first so default costs can be tailored to a country and scenario.', 'warning');
+        return;
+      }
+      const defaults = computeEvidenceBasedCosts(state.settings, state.config);
+      if (!defaults) {
+        showToast('Could not compute default costs.', 'error');
+        return;
+      }
+      document.getElementById('cost-it-systems').value = defaults.itSystems;
+      document.getElementById('cost-communications').value = defaults.comms;
+      document.getElementById('cost-enforcement').value = defaults.enforcement;
+      document.getElementById('cost-compensation').value = defaults.compensation;
+      document.getElementById('cost-admin').value = defaults.admin;
+      document.getElementById('cost-other').value = defaults.other;
+      applyCostsFromForm();
+      updateAll();
+      showToast('Country- and scenario-specific default costs loaded.', 'success');
     });
   }
 
@@ -486,6 +676,7 @@ function attachEventHandlers() {
       saveToStorage();
       rebuildScenariosTable();
       updateScenarioBriefingCurrent();
+      updateAiPrompt();
       showToast('All saved scenarios cleared from this browser.', 'warning');
     });
   }
@@ -520,6 +711,12 @@ function applySettingsFromForm() {
   showToast('Settings applied.', 'success');
 }
 
+function inferCurrencyLabel(country) {
+  if (country === 'AU') return 'AUD';
+  if (country === 'FR' || country === 'IT') return 'EUR';
+  return 'local currency units';
+}
+
 function applyConfigFromForm() {
   const country = document.getElementById('cfg-country').value;
   const outbreak = document.getElementById('cfg-outbreak').value;
@@ -527,6 +724,17 @@ function applyConfigFromForm() {
   const exemptions = document.getElementById('cfg-exemptions').value;
   const coverage = parseFloat(document.getElementById('cfg-coverage').value);
   const livesPer100k = parseFloat(document.getElementById('cfg-lives').value);
+
+  // Auto-set currency label if still generic
+  const currencyInput = document.getElementById('setting-currency');
+  if (currencyInput) {
+    const currentLabel = (currencyInput.value || '').trim();
+    if (currentLabel === '' || currentLabel === 'local currency units') {
+      currencyInput.value = inferCurrencyLabel(country);
+    }
+  }
+
+  updateSettingsFromForm(); // refresh state.settings with potential new currency
 
   state.config = {
     country,
@@ -536,6 +744,9 @@ function applyConfigFromForm() {
     coverage,
     livesPer100k
   };
+
+  // Refresh benefit metric UI with the new country context
+  updateBenefitMetricUI({ resetValue: false });
 
   state.derived = computeDerived(state.settings, state.config, state.costs);
 }
@@ -775,19 +986,22 @@ function updateResultsSummary() {
   updateStatusChips(c, d);
 }
 
-/* Status chips for support and BCR */
+/* Status chips for support, BCR, and data completeness */
 
 function updateStatusChips(config, derived) {
   const chipSupport = document.getElementById('status-support');
   const chipBcr = document.getElementById('status-bcr');
+  const chipData = document.getElementById('status-data');
 
-  if (!chipSupport || !chipBcr) return;
+  if (!chipSupport || !chipBcr || !chipData) return;
 
   if (!config || !derived) {
     chipSupport.textContent = 'Support: –';
     chipSupport.className = 'status-chip status-neutral';
     chipBcr.textContent = 'BCR: –';
     chipBcr.className = 'status-chip status-neutral';
+    chipData.textContent = 'Data: –';
+    chipData.className = 'status-chip status-neutral';
     return;
   }
 
@@ -829,36 +1043,40 @@ function updateStatusChips(config, derived) {
 
   chipBcr.textContent = bcrText;
   chipBcr.className = bcrClass;
+
+  const hasCosts = derived.costTotal && derived.costTotal > 0;
+  const hasBenefitMetric = state.settings.vslValue && state.settings.vslValue > 0;
+
+  let dataClass = 'status-chip ';
+  let dataText;
+
+  if (hasCosts && hasBenefitMetric) {
+    dataClass += 'status-good';
+    dataText = 'Data: Costs & benefit metric set';
+  } else if (hasBenefitMetric || hasCosts) {
+    dataClass += 'status-med';
+    dataText = hasBenefitMetric
+      ? 'Data: Benefit metric set, costs incomplete'
+      : 'Data: Costs entered, benefit metric missing';
+  } else {
+    dataClass += 'status-neutral';
+    dataText = 'Data: Incomplete';
+  }
+
+  chipData.textContent = dataText;
+  chipData.className = dataClass;
 }
 
 /* =========================================================
    MRS section (lives-saved equivalents)
    ========================================================= */
 
-function updateMRSSection(config) {
-  const tableBody = document.querySelector('#mrs-table tbody');
-  const mrsNarr = document.getElementById('mrsNarrative');
-  if (!tableBody) return;
-
-  tableBody.innerHTML = '';
-
-  if (!config) {
-    if (mrsNarr) {
-      mrsNarr.textContent =
-        'Configure a mandate to see how changes in scope, exemptions or coverage compare to changes in expected lives saved. Positive values indicate changes that reduce acceptability; negative values indicate changes that increase acceptability.';
-    }
-    return;
-  }
+function computeMRSRows(config) {
+  if (!config) return [];
 
   const coefs = mxlCoefs[config.country || 'AU'][config.outbreak || 'mild'];
   const betaLives = coefs.lives || 0;
-  if (!betaLives) {
-    if (mrsNarr) {
-      mrsNarr.textContent =
-        'Lives-saved equivalents (MRS) are not available because the lives-saved coefficient is missing in the current setting.';
-    }
-    return;
-  }
+  if (!betaLives) return [];
 
   const rows = [];
 
@@ -871,10 +1089,10 @@ function updateMRSSection(config) {
         mrsScope >= 0
           ? `This change is as demanding in acceptability terms as losing about ${mrsScope.toFixed(
               1
-            )} expected lives saved per 100,000 people.`
+            )} expected lives saved per 100,000 people (less preferred).`
           : `This change increases acceptability, similar to gaining about ${Math.abs(
               mrsScope
-            ).toFixed(1)} expected lives saved per 100,000 people.`
+            ).toFixed(1)} expected lives saved per 100,000 people (more preferred).`
     });
   }
 
@@ -885,10 +1103,10 @@ function updateMRSSection(config) {
       value: mrsExMedRel,
       interpretation:
         mrsExMedRel >= 0
-          ? `Moving to medical + religious exemptions is viewed as restrictive as losing about ${mrsExMedRel.toFixed(
+          ? `Moving to medical + religious exemptions is viewed as less desirable, comparable to losing about ${mrsExMedRel.toFixed(
               1
             )} expected lives saved per 100,000.`
-          : `Moving to medical + religious exemptions is viewed as favourable, similar to gaining about ${Math.abs(
+          : `Moving to medical + religious exemptions is viewed as more desirable, similar to gaining about ${Math.abs(
               mrsExMedRel
             ).toFixed(1)} expected lives saved per 100,000.`
     });
@@ -899,10 +1117,10 @@ function updateMRSSection(config) {
       value: mrsExMedRelPers,
       interpretation:
         mrsExMedRelPers >= 0
-          ? `Allowing medical, religious and personal belief exemptions is viewed as restrictive as losing about ${mrsExMedRelPers.toFixed(
+          ? `Allowing medical, religious and personal belief exemptions is viewed as less preferred, similar to losing about ${mrsExMedRelPers.toFixed(
               1
             )} expected lives saved per 100,000.`
-          : `Allowing medical, religious and personal belief exemptions is viewed as favourable, similar to gaining about ${Math.abs(
+          : `Allowing medical, religious and personal belief exemptions is viewed as more preferred, similar to gaining about ${Math.abs(
               mrsExMedRelPers
             ).toFixed(1)} expected lives saved per 100,000.`
     });
@@ -917,10 +1135,10 @@ function updateMRSSection(config) {
         mrsCov >= 0
           ? `Raising the lifting threshold to 70% is as demanding as losing about ${mrsCov.toFixed(
               1
-            )} expected lives saved per 100,000.`
+            )} expected lives saved per 100,000 (less preferred).`
           : `Raising the lifting threshold to 70% is viewed as beneficial, similar to gaining about ${Math.abs(
               mrsCov
-            ).toFixed(1)} expected lives saved per 100,000.`
+            ).toFixed(1)} expected lives saved per 100,000 (more preferred).`
     });
   } else if (config.coverage === 0.9) {
     const mrsCov = -coefs.cov90 / betaLives;
@@ -931,11 +1149,39 @@ function updateMRSSection(config) {
         mrsCov >= 0
           ? `Raising the lifting threshold to 90% is as demanding as losing about ${mrsCov.toFixed(
               1
-            )} expected lives saved per 100,000.`
+            )} expected lives saved per 100,000 (less preferred).`
           : `Raising the lifting threshold to 90% is viewed as beneficial, similar to gaining about ${Math.abs(
               mrsCov
-            ).toFixed(1)} expected lives saved per 100,000.`
+            ).toFixed(1)} expected lives saved per 100,000 (more preferred).`
     });
+  }
+
+  return rows;
+}
+
+function updateMRSSection(config) {
+  const tableBody = document.querySelector('#mrs-table tbody');
+  const mrsNarr = document.getElementById('mrsNarrative');
+  if (!tableBody) return;
+
+  tableBody.innerHTML = '';
+
+  if (!config) {
+    if (mrsNarr) {
+      mrsNarr.textContent =
+        'Configure a mandate to see how changes in scope, exemptions or coverage compare to changes in expected lives saved. Positive values indicate changes that make the option less preferred; negative values indicate changes that make it more preferred.';
+    }
+    return;
+  }
+
+  const rows = computeMRSRows(config);
+
+  if (!rows.length) {
+    if (mrsNarr) {
+      mrsNarr.textContent =
+        'Under the current configuration there is no attribute change to contrast, or the lives-saved coefficient is not available, so lives-saved equivalents (MRS) are not displayed.';
+    }
+    return;
   }
 
   rows.slice(0, 3).forEach(row => {
@@ -955,13 +1201,8 @@ function updateMRSSection(config) {
   });
 
   if (mrsNarr) {
-    if (!rows.length) {
-      mrsNarr.textContent =
-        'Under the current configuration there is no attribute change to contrast, so lives-saved equivalents (MRS) are not displayed.';
-    } else {
-      mrsNarr.textContent =
-        'Lives-saved equivalents show how strongly people care about mandate design features in terms of “extra lives saved per 100,000 people”. Positive values reflect changes that reduce acceptability; negative values reflect changes that increase acceptability.';
-    }
+    mrsNarr.textContent =
+      'Lives-saved equivalents show how strongly people care about mandate design features in terms of “extra lives saved per 100,000 people”. Positive values reflect changes that make the option less preferred; negative values reflect changes that make it more preferred.';
   }
 }
 
@@ -972,16 +1213,18 @@ function updateMRSSection(config) {
 function updateCharts(derived, settings) {
   const ctxBcr = document.getElementById('chart-bcr');
   const ctxSupport = document.getElementById('chart-support');
-
-  if (!ctxBcr || !ctxSupport) return;
+  const ctxMRS = document.getElementById('chart-mrs');
 
   if (bcrChart) bcrChart.destroy();
   if (supportChart) supportChart.destroy();
+  if (mrsChart) mrsChart.destroy();
 
   if (!derived) return;
+  if (!ctxBcr || !ctxSupport) return;
 
   const cur = settings.currencyLabel;
 
+  // Cost–benefit chart
   bcrChart = new Chart(ctxBcr, {
     type: 'bar',
     data: {
@@ -1014,23 +1257,29 @@ function updateCharts(derived, settings) {
     }
   });
 
-  const suppPct = ((derived.support || 0) * 100);
-  let supportColor = '#ef4444'; // red
+  // Support vs opt-out chart
+  const suppPct = (derived.support || 0) * 100;
+  const optOutPct = 100 - suppPct;
+
+  let supportColor = '#ef4444'; // default red for very low support
   if (suppPct >= 70) {
     supportColor = '#059669'; // green
   } else if (suppPct >= 50) {
     supportColor = '#f59e0b'; // amber
+  } else {
+    supportColor = '#ef4444'; // red
   }
+  const optOutColor = '#b91c1c';
 
   supportChart = new Chart(ctxSupport, {
     type: 'bar',
     data: {
-      labels: ['Predicted public support'],
+      labels: ['Support', 'Opt-out'],
       datasets: [
         {
-          label: 'Support (%)',
-          data: [parseFloat(suppPct.toFixed(1))],
-          backgroundColor: [supportColor]
+          label: 'Share (%)',
+          data: [parseFloat(suppPct.toFixed(1)), parseFloat(optOutPct.toFixed(1))],
+          backgroundColor: [supportColor, optOutColor]
         }
       ]
     },
@@ -1055,6 +1304,49 @@ function updateCharts(derived, settings) {
       }
     }
   });
+
+  // MRS chart
+  if (ctxMRS && state.config) {
+    const mrsRows = computeMRSRows(state.config) || [];
+    if (mrsRows.length) {
+      const labels = mrsRows.map(r => r.attribute);
+      const data = mrsRows.map(r => parseFloat(r.value.toFixed(1)));
+      const colors = mrsRows.map(r => (r.value >= 0 ? '#b91c1c' : '#059669'));
+
+      mrsChart = new Chart(ctxMRS, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Lives-saved equivalent (per 100,000)',
+              data,
+              backgroundColor: colors
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => `${ctx.parsed.x.toFixed(1)} lives per 100,000`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                callback: value => value.toFixed ? value.toFixed(1) : value
+              }
+            }
+          }
+        }
+      });
+    }
+  }
 }
 
 /* =========================================================
@@ -1080,6 +1372,7 @@ function saveScenario() {
   saveToStorage();
   rebuildScenariosTable();
   populateScenarioBriefing(s);
+  updateAiPrompt();
   showToast('Scenario saved.', 'success');
 }
 
@@ -1120,6 +1413,12 @@ function rebuildScenariosTable() {
       tr.appendChild(td);
     });
 
+    const incomplete = !d || !d.costTotal || d.costTotal === 0 || d.bcr == null;
+    if (incomplete) {
+      tr.classList.add('scenario-incomplete');
+      tr.title = 'Costs not entered or BCR not defined – interpret with caution.';
+    }
+
     tr.addEventListener('click', () => {
       populateScenarioBriefing(s);
     });
@@ -1147,7 +1446,7 @@ function populateScenarioBriefing(scenario) {
     )} per 100,000 people, implying around ${d.livesTotal.toFixed(
       1
     )} lives saved in the exposed population.\n` +
-    `Monetary benefit of lives saved (using the chosen value-per-life metric): ${formatCurrency(
+    `Monetary benefit of lives saved (using the chosen benefit metric): ${formatCurrency(
       d.benefitMonetary,
       cur
     )}.\n` +
@@ -1157,7 +1456,7 @@ function populateScenarioBriefing(scenario) {
       d.netBenefit,
       cur
     )} and a benefit–cost ratio of ${d.bcr != null ? d.bcr.toFixed(2) : 'not defined'}.\n` +
-    `Model-based predicted public support for this mandate is approximately ${formatPercent(supp)}.\n` +
+    `Model-based predicted public support for this potential future mandate is approximately ${formatPercent(supp)}.\n` +
     `Interpretation: This summary can be pasted into emails or briefing documents and should be read alongside qualitative, ethical and legal considerations that are not captured in the preference study or the simple economic valuation used here.`;
 
   txt.value = text;
@@ -1186,7 +1485,7 @@ function updateScenarioBriefingCurrent() {
     `Expected lives saved: ${c.livesPer100k.toFixed(
       1
     )} per 100,000 people (≈${d.livesTotal.toFixed(1)} lives saved in the exposed population).\n` +
-    `Monetary value of lives saved: ${formatCurrency(d.benefitMonetary, cur)}.\n` +
+    `Monetary value of lives saved (based on the selected benefit metric): ${formatCurrency(d.benefitMonetary, cur)}.\n` +
     `Implementation cost (if entered): ${
       d.costTotal > 0 ? formatCurrency(d.costTotal, cur) : 'not yet entered'
     }; net benefit: ${formatCurrency(d.netBenefit, cur)}; BCR: ${
@@ -1258,7 +1557,7 @@ function exportScenarios(kind) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = kind === 'excel' ? 'mandeval_scenarios.xlsx.csv' : 'mandeval_scenarios.csv';
+    a.download = kind === 'excel' ? 'emandeval_future_scenarios.xlsx.csv' : 'emandeval_future_scenarios.csv';
     a.click();
     URL.revokeObjectURL(url);
     showToast(
@@ -1274,7 +1573,7 @@ function exportScenarios(kind) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'mandeval_scenarios_summary.csv';
+    a.download = 'emandeval_future_scenarios_summary.csv';
     a.click();
     URL.revokeObjectURL(url);
     showToast('Summary data exported as CSV for use in PDF/reporting tools.', 'success');
@@ -1288,7 +1587,7 @@ function exportScenarios(kind) {
 }
 
 function exportScenariosAsWord() {
-  const title = 'MANDEVAL – Vaccine Mandate Scenario Briefings';
+  const title = 'eMANDEVAL-Future – Vaccine Mandate Scenario Briefings';
   const now = new Date().toLocaleString();
 
   let html = `
@@ -1314,7 +1613,7 @@ function exportScenariosAsWord() {
 <h1>${escapeHtml(title)}</h1>
 <p class="meta">Generated on ${escapeHtml(
     now
-  )}. Each scenario is based on mixed logit preference estimates and user-entered settings in the MANDEVAL tool.</p>
+  )}. Each scenario is based on mixed logit preference estimates and user-entered settings in the eMANDEVAL-Future tool.</p>
 `;
 
   state.scenarios.forEach(s => {
@@ -1346,7 +1645,10 @@ function exportScenariosAsWord() {
     html += `<li><span class="label">Total lives saved (approx.):</span> ${
       d.livesTotal ? d.livesTotal.toFixed(1) : '–'
     } lives</li>`;
-    html += `<li><span class="label">Value per life saved:</span> ${formatCurrency(set.vslValue, cur)}</li>`;
+    html += `<li><span class="label">Benefit metric (per life saved or equivalent):</span> ${formatCurrency(
+      set.vslValue,
+      cur
+    )}</li>`;
     html += `<li><span class="label">Monetary benefit of lives saved:</span> ${formatCurrency(
       d.benefitMonetary || 0,
       cur
@@ -1381,7 +1683,7 @@ function exportScenariosAsWord() {
     html += `</div>`;
   });
 
-  html += `<p class="meta">Note: All figures depend on the assumptions entered into MANDEVAL (population, value per life saved, cost inputs). For formal regulatory appraisal, the underlying data and assumptions should be checked and documented in a technical annex.</p>`;
+  html += `<p class="meta">Note: All figures depend on the assumptions entered into eMANDEVAL-Future (population, benefit metric per life saved, cost inputs). For formal regulatory appraisal, the underlying data and assumptions should be checked and documented in a technical annex.</p>`;
   html += `</body></html>`;
 
   const blobDoc = new Blob([html], {
@@ -1390,7 +1692,7 @@ function exportScenariosAsWord() {
   const url = URL.createObjectURL(blobDoc);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'mandeval_scenarios_briefing.doc';
+  a.download = 'emandeval_future_scenarios_briefing.doc';
   a.click();
   URL.revokeObjectURL(url);
   showToast('Word briefing downloaded (ready to print or edit).', 'success');
@@ -1415,10 +1717,13 @@ function updateBriefingTemplate() {
   const s = state.settings;
   const supp = (d.support || 0) * 100;
   const cur = s.currencyLabel;
+  const metricLabel = benefitMetricMeta[s.vslMetric]
+    ? benefitMetricMeta[s.vslMetric].label
+    : 'Selected benefit metric';
 
   const text =
     `Purpose\n` +
-    `Summarise the expected public support, epidemiological benefits and indicative economic value of a specific COVID-19 vaccine mandate configuration in ${countryLabel(
+    `Summarise the expected public support, epidemiological benefits and indicative economic value of a specific potential future vaccine mandate configuration in ${countryLabel(
       c.country
     )} under a ${outbreakLabel(c.outbreak).toLowerCase()} scenario.\n\n` +
     `Mandate configuration\n` +
@@ -1431,7 +1736,8 @@ function updateBriefingTemplate() {
     `Epidemiological benefit and monetary valuation\n` +
     `• Exposed population: ${s.population.toLocaleString()} people\n` +
     `• Total lives saved (model input × population): ${d.livesTotal.toFixed(1)}\n` +
-    `• Value per life saved (VSL or related metric): ${formatCurrency(s.vslValue, cur)}\n` +
+    `• Benefit metric: ${metricLabel}\n` +
+    `• Value per life saved / equivalent health gain: ${formatCurrency(s.vslValue, cur)}\n` +
     `• Monetary value of lives saved: ${formatCurrency(d.benefitMonetary, cur)}\n\n` +
     `Costs and benefit–cost profile\n` +
     `• Total implementation cost (as entered): ${formatCurrency(d.costTotal, cur)}\n` +
@@ -1455,9 +1761,68 @@ function updateAiPrompt() {
   const el = document.getElementById('ai-prompt');
   if (!el) return;
 
+  const scenarios = state.scenarios || [];
+
+  // Case 1: at least one saved scenario – use them for comparison
+  if (scenarios.length > 0) {
+    const multi = scenarios.length > 1;
+    let prompt =
+      `You are helping a public health policy team evaluate potential future vaccine mandates.\n\n` +
+      `We have ${scenarios.length} saved mandate scenario${multi ? 's' : ''} generated from the eMANDEVAL-Future tool. Each scenario includes a mandate design, expected epidemiological benefit, monetary valuation and indicative implementation costs.\n\n`;
+
+    scenarios.forEach(s => {
+      const c = s.config;
+      const d = s.derived || {};
+      const set = s.settings || state.settings;
+      const cur = set.currencyLabel;
+      const supp = (d.support || 0) * 100;
+      const metricLabel = benefitMetricMeta[set.vslMetric]
+        ? benefitMetricMeta[set.vslMetric].label
+        : 'Selected benefit metric';
+
+      prompt += `SCENARIO ${s.id}\n`;
+      prompt += `- Country: ${countryLabel(c.country)}\n`;
+      prompt += `- Outbreak scenario: ${outbreakLabel(c.outbreak)}\n`;
+      prompt += `- Mandate scope: ${scopeLabel(c.scope)}\n`;
+      prompt += `- Exemption policy: ${exemptionsLabel(c.exemptions)}\n`;
+      prompt += `- Coverage threshold to lift mandate: ${coverageLabel(c.coverage)}\n`;
+      prompt += `- Expected lives saved: ${c.livesPer100k.toFixed(1)} per 100,000 people\n`;
+      prompt += `- Population covered: ${set.population.toLocaleString()} people\n`;
+      prompt += `- Benefit metric: ${metricLabel}\n`;
+      prompt += `- Value per life saved / equivalent health gain: ${formatCurrency(set.vslValue, cur)}\n`;
+      prompt += `- Estimated total lives saved: ${d.livesTotal ? d.livesTotal.toFixed(1) : '–'}\n`;
+      prompt += `- Monetary benefit of lives saved: ${formatCurrency(d.benefitMonetary || 0, cur)}\n`;
+      prompt += `- Total implementation cost: ${formatCurrency(d.costTotal || 0, cur)}\n`;
+      prompt += `- Net benefit: ${formatCurrency(d.netBenefit || 0, cur)}\n`;
+      prompt += `- Benefit–cost ratio (BCR): ${d.bcr != null ? d.bcr.toFixed(2) : 'not defined'}\n`;
+      prompt += `- Model-based predicted public support: ${formatPercent(supp)}\n\n`;
+    });
+
+    prompt += `TASK FOR YOU:\n`;
+    if (multi) {
+      prompt +=
+        `1. Provide a concise comparative summary of the scenarios, highlighting key differences in mandate design, predicted support, epidemiological benefit and benefit–cost performance.\n` +
+        `2. Identify which scenario or small set of scenarios appear most attractive under different decision criteria, for example: (a) maximising predicted support subject to a minimum BCR; (b) maximising BCR subject to a minimum support level.\n` +
+        `3. Flag key uncertainties or assumptions that decision-makers should be aware of (for example the choice of benefit metric, the quality of cost estimates, distributional impacts).\n` +
+        `4. Suggest up to three concise points for ministers or senior officials to consider when comparing these options, including any obvious “dominated” scenarios that should probably be ruled out.\n`;
+    } else {
+      prompt +=
+        `1. Provide a short, neutral and clear policy briefing that summarises this scenario in plain language.\n` +
+        `2. Highlight the trade-offs between public health impact, costs and public support.\n` +
+        `3. Flag key uncertainties or assumptions that should be made explicit.\n` +
+        `4. Suggest up to three points for ministers or senior officials to consider when comparing this option with potential alternatives.\n`;
+    }
+
+    prompt += `\nUse British spelling and keep the tone suitable for a government briefing. Do not assume that the scenarios fully capture legal, ethical or equity considerations; instead, explicitly note that these require separate assessment.`;
+
+    el.value = prompt;
+    return;
+  }
+
+  // Case 2: no saved scenarios but a current configuration exists – fall back to current config
   if (!state.config || !state.derived) {
     el.value =
-      'Apply a configuration and enter costs to auto-generate an AI prompt for Copilot or ChatGPT based on the current scenario.';
+      'Apply a configuration and enter costs (and/or save scenarios) to auto-generate an AI prompt for Copilot or ChatGPT based on the current scenario.';
     return;
   }
 
@@ -1466,9 +1831,12 @@ function updateAiPrompt() {
   const s = state.settings;
   const supp = (d.support || 0) * 100;
   const cur = s.currencyLabel;
+  const metricLabelSingle = benefitMetricMeta[s.vslMetric]
+    ? benefitMetricMeta[s.vslMetric].label
+    : 'Selected benefit metric';
 
-  const prompt =
-    `You are helping a public health policy team design a COVID-19 vaccine mandate.\n\n` +
+  const promptSingle =
+    `You are helping a public health policy team design a potential future vaccine mandate.\n\n` +
     `CURRENT MANDATE CONFIGURATION\n` +
     `- Country: ${countryLabel(c.country)}\n` +
     `- Outbreak scenario: ${outbreakLabel(c.outbreak)}\n` +
@@ -1480,7 +1848,8 @@ function updateAiPrompt() {
     `- Analysis horizon: ${s.horizonYears} year(s)\n` +
     `- Population covered: ${s.population.toLocaleString()} people\n` +
     `- Currency label: ${cur}\n` +
-    `- Value per life saved (VSL or related metric): ${formatCurrency(s.vslValue, cur)}\n\n` +
+    `- Benefit metric: ${metricLabelSingle}\n` +
+    `- Value per life saved / equivalent health gain: ${formatCurrency(s.vslValue, cur)}\n\n` +
     `COST–BENEFIT SUMMARY FOR CURRENT CONFIGURATION\n` +
     `- Total implementation cost: ${formatCurrency(d.costTotal, cur)}\n` +
     `- Estimated total lives saved: ${d.livesTotal.toFixed(1)}\n` +
@@ -1496,7 +1865,7 @@ function updateAiPrompt() {
     `4. Suggests up to three points for ministers or senior officials to consider when comparing this option with alternatives.\n\n` +
     `Use British spelling and keep the tone suitable for a government briefing.`;
 
-  el.value = prompt;
+  el.value = promptSingle;
 }
 
 /* =========================================================
