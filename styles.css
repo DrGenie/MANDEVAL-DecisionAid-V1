@@ -47,7 +47,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 12px 18px;
-  background: #0b3d91;
+  background: linear-gradient(135deg, #0b3d91, #1557bf);
   color: #ffffff;
   border-bottom: 4px solid #1557bf;
 }
@@ -59,16 +59,17 @@ body {
 }
 
 .app-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
-  background: #ffffff;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: radial-gradient(circle at 30% 30%, #ffffff, #dbeafe);
   color: #0b3d91;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 1.2rem;
+  font-weight: 800;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.4);
 }
 
 .app-title-block h1 {
@@ -183,6 +184,16 @@ ol {
   border-left: 3px solid #1557bf;
   border-radius: 4px;
   font-size: 0.9rem;
+}
+
+.context-banner {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: #fff7ed;
+  border-left: 3px solid #f97316;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #92400e;
 }
 
 .how-to-list li {
@@ -489,6 +500,10 @@ textarea {
 .table tbody tr:hover {
   background: #e5f0ff;
   cursor: pointer;
+}
+
+.scenario-incomplete {
+  opacity: 0.6;
 }
 
 /* Toasts */
