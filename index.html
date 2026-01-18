@@ -16,8 +16,9 @@
       </div>
     </div>
     <div class="app-meta">
-      <span>Version: <strong>v1.1.0</strong></span>
+      <span>Version: <strong>v2.0.0</strong></span>
       <span>Built: Jan 2026</span>
+      <button id="btn-presentation-mode" class="btn outline" type="button">Presentation mode</button>
     </div>
   </header>
 
@@ -58,11 +59,12 @@
         <ol class="how-to-list">
           <li>
             <strong>Settings:</strong> Specify the analysis horizon, population covered, currency label and benefit
-            metric (for example a value of statistical life) with a default value.
+            metric (for example a value of statistical life) with a default value. Optional calibration helpers allow
+            you to align with current regulatory guidance.
           </li>
           <li>
             <strong>Configuration:</strong> Choose a country, outbreak scenario and mandate design (scope, exemptions,
-            coverage threshold, expected lives saved).
+            coverage threshold, expected lives saved). Optionally add short distributional and equity notes.
           </li>
           <li>
             <strong>Costing:</strong> Enter indicative implementation costs across major cost categories or load
@@ -70,14 +72,17 @@
           </li>
           <li>
             <strong>Results:</strong> Review predicted public support, lives saved, benefit–cost metrics and
-            lives-saved-equivalent preferences (MRS), including visual summaries.
+            lives-saved-equivalent preferences (MRS), including visual summaries. Additional metrics translate lives
+            saved into hospitalisations, ICU admissions and working days saved.
           </li>
           <li>
-            <strong>Saved scenarios:</strong> Save and export scenarios for comparison and reporting.
+            <strong>Saved scenarios:</strong> Save and export scenarios for comparison and reporting. Use the pinned
+            scenario dashboard to compare up to three options with a radar chart and traffic-light stripes.
           </li>
           <li>
             <strong>Briefings &amp; AI prompts:</strong> Generate briefing text and prompts for Copilot or ChatGPT to
-            refine policy documents, including comparisons across multiple saved scenarios.
+            refine policy documents, including single-scenario briefs and multi-scenario comparative memos with an
+            explicit equity reflection block.
           </li>
         </ol>
       </div>
@@ -92,11 +97,13 @@
         </p>
         <p>
           Cost and benefit inputs are indicative and should be aligned with country-specific regulatory impact analysis
-          guidance before formal use.
+          guidance before formal use. Country presets and calibration helpers allow you to restore recommended defaults
+          or align the tool with updated national guidance.
         </p>
         <p class="context-banner">
           This tool summarises preference and cost–benefit evidence for potential future vaccine mandates. It does not
-          replace legal review, ethical assessment or detailed equity analysis.
+          replace legal review, ethical assessment or detailed equity analysis. Distributional notes and equity flags
+          are provided as prompts for discussion rather than a full equity model.
         </p>
       </div>
     </section>
@@ -207,7 +214,8 @@
         <h2>Settings</h2>
         <p>
           Use these settings to define the population, analysis horizon and benefit metric per life saved. These settings
-          apply to all scenarios.
+          apply to all scenarios. Additional benefit metrics translate lives saved into hospitalisations, ICU admissions
+          and working days saved.
         </p>
 
         <div class="form-grid">
@@ -238,13 +246,16 @@
           <div class="form-group">
             <label for="setting-vsl-metric">
               Benefit metric
-              <span class="info-icon" data-tooltip="Choose how the monetary value per life saved is interpreted (for example a value of statistical life, value of a life-year, or value per QALY).">i</span>
+              <span class="info-icon" data-tooltip="Choose how the monetary value per life saved is interpreted, or which primary outcome to emphasise in the results narrative.">i</span>
             </label>
             <select id="setting-vsl-metric">
               <option value="vsl" selected>Value of statistical life (VSL)</option>
               <option value="vsly">Value of a statistical life-year (VSLY)</option>
               <option value="qalys">Monetary value per QALY gained</option>
               <option value="healthsys">Average health system cost savings per life saved</option>
+              <option value="hosp">Expected hospitalisations averted</option>
+              <option value="icu">Expected ICU admissions averted</option>
+              <option value="workdays">Expected working days saved</option>
             </select>
           </div>
 
@@ -254,10 +265,94 @@
               <span class="info-icon" data-tooltip="Monetary value attached to each life saved or equivalent health gain, consistent with your chosen benefit metric and regulatory guidance.">i</span>
             </label>
             <input type="number" id="setting-vsl" min="0" step="100000" value="5400000" />
+            <div id="vsl-calibration-note" class="small-note"></div>
           </div>
         </div>
 
-        <button id="btn-apply-settings" class="btn primary">Apply settings</button>
+        <h3>Additional benefit metrics (non-monetary, optional)</h3>
+        <p class="small-note">
+          These conversions are used to translate lives saved into hospitalisations, ICU admissions and working days
+          saved for narrative purposes. They are not treated as separate cost–benefit ratios.
+        </p>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="metric-hosp-per-life">
+              Hospitalisations averted per life saved
+              <span class="info-icon" data-tooltip="For example, if each life saved corresponds to 8 hospital admissions averted, enter 8.">i</span>
+            </label>
+            <input type="number" id="metric-hosp-per-life" min="0" step="0.1" value="8" />
+          </div>
+          <div class="form-group">
+            <label for="metric-hosp-per100k">
+              Override: hospitalisations averted per 100,000 people (optional)
+              <span class="info-icon" data-tooltip="If you have a direct estimate of hospitalisations averted per 100,000 people, enter it here to override the conversion above.">i</span>
+            </label>
+            <input type="number" id="metric-hosp-per100k" min="0" step="1" />
+          </div>
+
+          <div class="form-group">
+            <label for="metric-icu-per-life">
+              ICU admissions averted per life saved
+              <span class="info-icon" data-tooltip="For example, if each life saved corresponds to 10 ICU admissions averted, enter 10.">i</span>
+            </label>
+            <input type="number" id="metric-icu-per-life" min="0" step="0.1" value="10" />
+          </div>
+          <div class="form-group">
+            <label for="metric-icu-per100k">
+              Override: ICU admissions averted per 100,000 people (optional)
+            </label>
+            <input type="number" id="metric-icu-per100k" min="0" step="1" />
+          </div>
+
+          <div class="form-group">
+            <label for="metric-workdays-per-life">
+              Working days saved per life saved
+              <span class="info-icon" data-tooltip="Approximate working days preserved across the economy per life saved.">i</span>
+            </label>
+            <input type="number" id="metric-workdays-per-life" min="0" step="1" value="180" />
+          </div>
+          <div class="form-group">
+            <label for="metric-workdays-per100k">
+              Override: working days saved per 100,000 people (optional)
+            </label>
+            <input type="number" id="metric-workdays-per100k" min="0" step="10" />
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-apply-settings" class="btn primary" type="button">Apply settings</button>
+          <button id="btn-restore-country-defaults" class="btn outline" type="button">
+            Restore recommended defaults for current country
+          </button>
+        </div>
+
+        <h3>Calibration helpers (optional)</h3>
+        <p class="small-note">
+          Use this section if your ministry has updated guidance on the value of a statistical life or related metrics.
+          The tool can store a user-calibrated default for this browser and add a visible note in the results.
+        </p>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="calibration-vsl-new">
+              New official value per life saved (for current country)
+            </label>
+            <input type="number" id="calibration-vsl-new" min="0" step="100000" />
+          </div>
+          <div class="form-group">
+            <label for="calibration-note-year">
+              Guideline year (for example 2029)
+            </label>
+            <input type="number" id="calibration-note-year" min="2000" max="2100" step="1" />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-calibration" class="btn outline" type="button">
+            Store as new default for this browser
+          </button>
+        </div>
+        <p id="calibration-status" class="small-note"></p>
       </div>
     </section>
 
@@ -343,8 +438,39 @@
         </div>
 
         <div class="btn-row">
-          <button id="btn-apply-config" class="btn primary">Apply configuration</button>
-          <button id="btn-save-scenario" class="btn outline">Save scenario</button>
+          <button id="btn-apply-config" class="btn primary" type="button">Apply configuration</button>
+          <button id="btn-save-scenario" class="btn outline" type="button">Save scenario</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Distributional and equity notes (optional)</h2>
+        <p class="small-note">
+          Use this section to record which groups or sectors are most affected by the configuration and any equity
+          concerns. Notes are saved with each scenario, flagged in the results and included in exports and AI prompts.
+        </p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="dist-groups">
+              Groups most affected
+              <span class="info-icon" data-tooltip="For example, older adults, low-income workers, specific regions or minority communities.">i</span>
+            </label>
+            <textarea id="dist-groups" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="dist-sectors">
+              Sectors most exposed
+              <span class="info-icon" data-tooltip="For example, hospitality, healthcare, education, transport or other sectors that bear most of the mandate burden.">i</span>
+            </label>
+            <textarea id="dist-sectors" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="dist-equity-concerns">
+              Equity concerns
+              <span class="info-icon" data-tooltip="Short notes on fairness issues such as disproportionate impact on vulnerable groups, enforcement risks or access barriers.">i</span>
+            </label>
+            <textarea id="dist-equity-concerns" rows="3"></textarea>
+          </div>
         </div>
       </div>
 
@@ -457,9 +583,9 @@
         </div>
 
         <div class="btn-row">
-          <button id="btn-apply-costs" class="btn primary">Apply costs</button>
-          <button id="btn-load-default-costs" class="btn outline">Load evidence-based default costs</button>
-          <button id="btn-save-scenario-costs" class="btn outline">Save scenario (with current costs)</button>
+          <button id="btn-apply-costs" class="btn primary" type="button">Apply costs</button>
+          <button id="btn-load-default-costs" class="btn outline" type="button">Load evidence-based default costs</button>
+          <button id="btn-save-scenario-costs" class="btn outline" type="button">Save scenario (with current costs)</button>
         </div>
       </div>
 
@@ -486,8 +612,8 @@
       <div class="card">
         <h2>Results</h2>
         <p>
-          This section summarises predicted public support, epidemiological benefits, monetary valuation and benefit–cost
-          metrics for the current configuration.
+          This section summarises predicted public support, epidemiological benefits, additional non-monetary metrics,
+          monetary valuation and benefit–cost metrics for the current configuration.
         </p>
 
         <div class="results-grid">
@@ -524,11 +650,39 @@
                 </span>
                 <span id="result-support" class="value">–</span>
               </li>
+              <li>
+                <span class="label">
+                  Hospitalisations averted (approx.)
+                </span>
+                <span id="result-hosp-averted" class="value">–</span>
+              </li>
+              <li>
+                <span class="label">
+                  ICU admissions averted (approx.)
+                </span>
+                <span id="result-icu-averted" class="value">–</span>
+              </li>
+              <li>
+                <span class="label">
+                  Working days saved (approx.)
+                </span>
+                <span id="result-workdays-saved" class="value">–</span>
+              </li>
             </ul>
 
+            <div id="equity-badge" class="equity-badge">
+              Equity concern flagged – see distributional notes.
+            </div>
+
             <p id="resultsNarrative" class="results-narrative">
-              Apply a configuration and, if possible, enter costs to see a narrative summary of cost–benefit performance and
-              model-based public support for the mandate.
+              Apply a configuration and, if possible, enter costs to see a narrative summary of cost–benefit performance,
+              model-based public support and additional non-monetary metrics (hospitalisations, ICU admissions and
+              working days saved).
+            </p>
+
+            <p id="delta-summary" class="small-note delta-summary">
+              When you adjust parameters and click “Apply configuration”, this box will highlight how key metrics changed
+              relative to the previous configuration.
             </p>
           </div>
 
@@ -540,9 +694,17 @@
           <div class="results-block">
             <h3>Predicted public support and opt-out</h3>
             <canvas id="chart-support" aria-label="Chart showing predicted public support and opt-out" role="img"></canvas>
+            <div class="support-threshold-legend">
+              <span class="legend-entry">
+                <span class="legend-line legend-line-minimal"></span> Minimal majority (50%)
+              </span>
+              <span class="legend-entry">
+                <span class="legend-line legend-line-strong"></span> Strong support threshold (70%)
+              </span>
+            </div>
             <p class="small-note">
-              Colours reflect indicative support levels: green (high ≥ 70%), amber (medium 50–69%), red for lower support
-              or higher opt-out.
+              Bars show the share of respondents predicted to support the mandate versus preferring no mandate. Dashed
+              lines at 50% and 70% indicate a minimal majority and a strong support threshold.
             </p>
           </div>
         </div>
@@ -584,18 +746,43 @@
       <div class="card">
         <p class="context-banner">
           Results are based on stated-preference data and simple cost–benefit calculations. They provide structured
-          evidence but do not by themselves determine whether a mandate is appropriate.
+          evidence but do not by themselves determine whether a mandate is appropriate. Equity and feasibility require
+          separate qualitative assessment.
         </p>
       </div>
     </section>
 
     <!-- Saved scenarios & exports -->
     <section id="tab-scenarios" class="tab-content">
+      <div class="card" id="scenario-dashboard-card">
+        <h2>Scenario comparison dashboard (pinned scenarios)</h2>
+        <p class="small-note">
+          Pin up to three scenarios to compare their support, benefit–cost ratio, total lives saved and implementation
+          cost. The radar chart and traffic-light stripes update automatically when you change the set of pinned
+          scenarios.
+        </p>
+        <div class="scenario-dashboard-layout">
+          <div class="scenario-dashboard-chart">
+            <canvas id="chart-scenario-radar" aria-label="Radar chart comparing pinned scenarios" role="img"></canvas>
+          </div>
+          <div class="scenario-dashboard-side">
+            <div id="pinned-scenarios-summary" class="pinned-scenarios-summary">
+              <!-- Filled dynamically -->
+            </div>
+            <div class="small-note">
+              Traffic-light stripes summarise each pinned scenario at a glance:
+              green (favourable), amber (intermediate) and red (unfavourable) for support and BCR.
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Saved scenarios</h2>
         <p>
-          Each saved scenario captures the current settings, mandate configuration, costs and model-based results. Click on
-          a row to populate the scenario briefing. Scenarios with incomplete cost data are shown in a lighter shade.
+          Each saved scenario captures the current settings, mandate configuration, costs, distributional notes and
+          model-based results. Click on a row to populate the scenario briefing. Scenarios with incomplete cost data are
+          shown in a lighter shade.
         </p>
 
         <div class="table-wrapper">
@@ -615,6 +802,8 @@
                 <th>Net benefit</th>
                 <th>BCR</th>
                 <th>Support</th>
+                <th>Equity notes</th>
+                <th>Pin</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -622,11 +811,11 @@
         </div>
 
         <div class="btn-row">
-          <button id="btn-export-csv" class="btn outline">Export scenarios (CSV)</button>
-          <button id="btn-export-excel" class="btn outline">Export scenarios (Excel-readable)</button>
-          <button id="btn-export-word" class="btn outline">Export briefing (Word)</button>
-          <button id="btn-export-pdf" class="btn outline">Export data (CSV for PDF tools)</button>
-          <button id="btn-clear-storage" class="btn danger">Clear all saved scenarios (this browser)</button>
+          <button id="btn-export-csv" class="btn outline" type="button">Export scenarios (CSV)</button>
+          <button id="btn-export-excel" class="btn outline" type="button">Export scenarios (Excel-readable)</button>
+          <button id="btn-export-word" class="btn outline" type="button">Export briefing (Word)</button>
+          <button id="btn-export-pdf" class="btn outline" type="button">Export data (CSV for PDF tools)</button>
+          <button id="btn-clear-storage" class="btn danger" type="button">Clear all saved scenarios (this browser)</button>
         </div>
       </div>
 
@@ -634,10 +823,11 @@
         <h2>Scenario briefing text</h2>
         <p>
           This text summarises the selected or current scenario in plain language. It can be pasted directly into emails,
-          briefing notes or meeting minutes.
+          briefing notes or meeting minutes. Where equity concerns have been flagged, those notes are appended for
+          discussion.
         </p>
         <textarea id="scenario-briefing-text" rows="10"></textarea>
-        <button id="btn-copy-briefing" class="btn primary">Copy briefing text</button>
+        <button id="btn-copy-briefing" class="btn primary" type="button">Copy briefing text</button>
       </div>
     </section>
 
@@ -647,22 +837,38 @@
         <h2>Policy briefing template</h2>
         <p>
           This template provides a structured summary for ministers or senior officials. It is automatically populated
-          based on the current configuration, settings and costs.
+          based on the current configuration, settings, costs and distributional notes.
         </p>
         <textarea id="briefing-template" rows="14"></textarea>
-        <button id="btn-copy-briefing-template" class="btn primary">Copy briefing template</button>
+        <button id="btn-copy-briefing-template" class="btn primary" type="button">Copy briefing template</button>
       </div>
 
       <div class="card">
-        <h2>AI prompt for Copilot / ChatGPT</h2>
+        <h2>AI prompts for Copilot / ChatGPT</h2>
         <p>
-          The prompt below is designed to refine one or more saved scenarios into a policy-ready briefing note. Copy the
-          prompt, open your preferred AI assistant, paste the text and run it.
+          Choose between a single-scenario policy brief and a comparative policy memo that draws on multiple saved
+          scenarios. Both prompt styles include an explicit equity reflection block.
         </p>
+
+        <div class="prompt-mode-toggle">
+          <label>
+            <input type="radio" name="prompt-mode" id="prompt-mode-single" value="single" checked />
+            Single scenario policy brief
+          </label>
+          <label>
+            <input type="radio" name="prompt-mode" id="prompt-mode-comparative" value="comparative" />
+            Comparative policy memo (uses saved scenarios)
+          </label>
+        </div>
+        <p class="small-note" id="prompt-mode-note">
+          Comparative policy memos require at least two saved scenarios. If fewer are available, the tool will
+          fall back to a single-scenario brief.
+        </p>
+
         <textarea id="ai-prompt" rows="18"></textarea>
         <div class="btn-row">
-          <button id="btn-copy-ai-prompt" class="btn primary">Copy AI prompt</button>
-          <button id="btn-open-ai" class="btn outline">Open Copilot in a new window</button>
+          <button id="btn-copy-ai-prompt" class="btn primary" type="button">Copy AI prompt</button>
+          <button id="btn-open-ai" class="btn outline" type="button">Open Copilot in a new window</button>
         </div>
       </div>
     </section>
@@ -694,7 +900,7 @@
 
   <footer class="app-footer">
     <span>eMANDEVAL-Future – Vaccine mandate decision aid</span>
-    <span>Version v1.1.0 &nbsp;|&nbsp; Built Jan 2026</span>
+    <span>Version v2.0.0 &nbsp;|&nbsp; Built Jan 2026</span>
   </footer>
 
   <!-- Global tooltip -->
